@@ -1,0 +1,302 @@
+name: mediaserver
+services:
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    user: "${PUID}:${PGID}"
+    environment:
+      - TZ=${TZ}
+      # Reverse-proxy ready (optional labels for later)
+      - JELLYFIN_PublishedServerUrl=${HOST_LAN}
+    volumes:
+      - /opt/mediaserver/jellyfin/config:/config
+      - /opt/mediaserver/jellyfin/cache:/cache
+      - /mnt/storage/data/media:/media
+    ports:
+      - "8096:8096"    # HTTP
+      # - "8920:8920"  # HTTPS (enable if you terminate TLS here)
+      # DLNA/UPnP optional:
+      # - "1900:1900/udp"
+      # - "7359:7359/udp"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    devices:
+      - /dev/dri:/dev/dri
+    group_add:
+      - "993"
+      - "44"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8096/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  plex:
+    image: lscr.io/linuxserver/plex:latest
+    container_name: plex
+    network_mode: "host"  # Plex works best on host network; avoids port juggling
+    environment:
+      - TZ=Europe/London                # <-- set your timezone
+      - PUID=1000                       # <-- set to your media user ID
+      - PGID=1000                       # <-- set to your media group ID
+      - UMASK=002
+      # Optional first-run claim token (remove after first start or leave empty)
+      # Get one from https://plex.tv/claim while logged in
+      # - PLEX_CLAIM=claim-xxxxxxxxxxxxxxxxxxxx
+    volumes:
+      - /opt/mediaserver/plex/config:/config     # <-- change to your preferred config path
+      - /mnt/storage/data/media:/media                # <-- root of your media library (or split by type)
+      # Optional: dedicate a fast transcode scratch dir (SSD/tmpfs)
+      - /opt/mediaserver/plex/transcode:/transcode
+    devices:
+      - /dev/dri:/dev/dri               # <-- enables Intel Quick Sync (iGPU) via VAAPI
+    # Improves device access for some hosts; harmless otherwise
+    group_add:
+      - "993"
+      - "44"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "bash", "-O", "extglob", "-c", "curl -fsS http://127.0.0.1:32400/identity || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+
+  overseerr:
+    image: lscr.io/linuxserver/overseerr:latest
+    container_name: overseerr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      # Optional: if you run through a reverse proxy at a subpath, set this
+      # - URL_BASE=/overseerr
+    volumes:
+      - /opt/mediaserver/overseerr:/config
+    ports:
+      - "5155:5055"        # host:container (avoid clash with jellyseerr)
+    restart: unless-stopped
+    extra_hosts:
+    - "host.docker.internal:host-gateway"  # <-- map this name to the Docker host
+    depends_on:
+      # not strictly required, but if you want the UI to see *arr* immediately:
+      - sonarr
+      - radarr
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5055/api/v1/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  sabnzbd:
+    image: lscr.io/linuxserver/sabnzbd:latest
+    container_name: sabnzbd
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - UMASK=${UMASK}
+    volumes:
+      - /opt/mediaserver/sabnzbd:/config
+      - /mnt/storage/data/:/data
+    ports:
+      - "8080:8080"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api?mode=version"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - /opt/mediaserver/prowlarr:/config
+      - /mnt/storage/data:/data
+    ports:
+      - "9696:9696"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9696/"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - UMASK=${UMASK}
+    volumes:
+      - /opt/mediaserver/sonarr:/config
+      - /mnt/storage/data:/data
+      - /mnt/storage/data/media:/media
+    ports:
+      - "8989:8989"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    restart: unless-stopped
+    depends_on:
+      - sabnzbd
+      - prowlarr
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8989/api/v3/system/status"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - UMASK=${UMASK}
+    volumes:
+      - /opt/mediaserver/radarr:/config
+      - /mnt/storage/data:/data
+      - /mnt/storage/data/media:/media
+    ports:
+      - "7878:7878"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    restart: unless-stopped
+    depends_on:
+      - sabnzbd
+      - prowlarr
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7878/api/v3/system/status"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - /opt/mediaserver/bazarr:/config
+      - /mnt/storage/data/media:/media
+    ports:
+      - "6767:6767"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    restart: unless-stopped
+    depends_on:
+      - sonarr
+      - radarr
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6767/system/status"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+
+  recyclarr:
+    image: ghcr.io/recyclarr/recyclarr:latest
+    container_name: recyclarr
+    user: "${PUID}:${PGID}"
+    environment:
+      - TZ=${TZ}
+    volumes:
+      - /opt/mediaserver/recyclarr:/config
+    # No ports; run via cron-like schedule below using restart policy + command
+    command: ["sync"]
+    restart: "no"  # We'll run on-demand with: docker compose run --rm recyclarr
+
+  jellyseerr:
+    image: fallenbagel/jellyseerr:latest
+    container_name: jellyseerr
+    environment:
+      - LOG_LEVEL=info
+      - TZ=${TZ}
+    volumes:
+      - /opt/mediaserver/jellyseerr:/app/config
+    ports:
+      - "5055:5055"
+    restart: unless-stopped
+    depends_on:
+      - jellyfin
+
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - TZ=Europe/London
+      - WATCHTOWER_NOTIFICATIONS=shoutrrr
+      - WATCHTOWER_NOTIFICATION_URL=discord://JEFJGh8jQNjrH6V8t6IsvE41olupuu2XPMPfp2t7uKvZ4LvbhTw5VcbRJcj2kRiSrgVp@1411600579880550460
+      - WATCHTOWER_NOTIFICATIONS_LEVEL=info        # startup + updates + warnings/errors
+      - WATCHTOWER_NOTIFICATION_REPORT=true        # send a summary every run (even 0 updates)
+      - WATCHTOWER_NOTIFICATION_TITLE_TAG=watchtower@${HOSTNAME}
+      - WATCHTOWER_INCLUDE_RESTARTING=true         # scan restarting containers too
+      - WATCHTOWER_INCLUDE_STOPPED=true            # scan stopped containers for image updates
+      - WATCHTOWER_NOTIFICATION_TITLE_TAG=watchtower@logan-lxc
+    command: >
+      --cleanup                    
+      --rolling-restart            
+      --stop-timeout 60s
+      --schedule "0 0 4 * * *"     
+    restart: unless-stopped
+
+  backup:
+    image: ghcr.io/borgmatic-collective/borgmatic:1.8.12
+    container_name: mediaserver-backup
+    restart: unless-stopped
+    environment:
+      TZ: "Europe/London"
+      BORG_REPOSITORY: "/mnt/backup/mediaserver"   # 👈 backups stored here
+      BORG_PASSPHRASE: "${BORG_PASSPHRASE:?set in .env}"
+    volumes:
+      # Borgmatic config & hooks
+      - ./backup/config:/etc/borgmatic:ro
+      # Provide crontab where the image expects it
+      - ./backup/config/crontab.txt:/etc/borgmatic.d/crontab.txt:ro
+      # Borg runtime state
+      - borg-cache:/root/.cache/borg
+      - borg-config:/root/.config/borg
+
+      # Sources to back up (read-only)
+      - .:/backup/mediaserver:ro
+
+      # Mount backup target from host
+      - /mnt/backup:/mnt/backup
+
+    read_only: true
+    tmpfs:
+      - /tmp:rw,exec
+      - /run:rw,exec
+
+volumes:
+  borg-cache:
+  borg-config:
+
+
+ 
+networks:
+  default:
+    name: media_net
+    driver: bridge
+    # Keeps LAN/Tailscale exposure simple via host IP bindings above
+
+# Note:
+# /mnt/storage/data is an existing NFS mount on the host. We bind-mount that into containers.
+# That keeps permissions consistent with PUID/PGID and avoids Docker's NFS volume caveats.

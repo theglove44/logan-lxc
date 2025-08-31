@@ -1,0 +1,36 @@
+# Never commit secrets or heavy appdata
+.env
+.vscode/
+backup/
+
+# Appdata folders (volumes) — exclude from VCS
+bazarr/
+jellyfin/
+jellyseerr/
+overseerr/
+plex/
+prowlarr/
+radarr/
+sabnzbd/
+sonarr/
+
+# Recyclarr runtime
+recyclarr/logs/
+recyclarr/configs/config.yaml
+recyclarr/repositories/
+
+# Common noise
+*.pid
+*.db*
+*.log
+**/logs/**
+**/log/**
+**/cache/**
+**/Backups/**
+transcode/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo

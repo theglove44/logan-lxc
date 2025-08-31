@@ -1,0 +1,82 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/recyclarr/recyclarr/master/schemas/config-schema.json
+
+radarr:
+  movies:
+    base_url: http://radarr:7878
+    # Use a real API key or set via env substitution
+    # api_key: ${RADARR_API_KEY}
+    api_key: CHANGEME_RADARR
+
+    quality_definition:
+      type: movie
+
+    quality_profiles:
+      - name: HD Bluray + WEB 1080p
+        reset_unmatched_scores:
+          enabled: true
+        qualities:
+          - name: WEB 1080p
+            qualities:
+              - WEBDL-1080p
+              - WEBRip-1080p
+          - name: Bluray-1080p
+        upgrade:
+          allowed: true
+          until_quality: WEB 1080p
+
+sonarr:
+  series:
+    base_url: http://sonarr:8989
+    # Use a real API key or set via env substitution
+    # api_key: ${SONARR_API_KEY}
+    api_key: CHANGEME_SONARR
+
+    quality_definition:
+      type: series
+
+    quality_profiles:
+      - name: HD-720p
+        reset_unmatched_scores:
+          enabled: true
+        qualities:
+          - name: WEB 720p
+            qualities:
+              - WEBDL-720p
+              - WEBRip-720p
+          - name: Bluray-720p
+        upgrade:
+          allowed: true
+          until_quality: WEB 720p
+
+      - name: HD-1080p
+        reset_unmatched_scores:
+          enabled: true
+        qualities:
+          - name: WEB 1080p
+            qualities:
+              - WEBDL-1080p
+              - WEBRip-1080p
+          - name: Bluray-1080p
+        upgrade:
+          allowed: true
+          until_quality: WEB 1080p
+
+      - name: HD-1080p-x265
+        reset_unmatched_scores:
+          enabled: true
+        qualities:
+          - name: WEB 1080p
+            qualities:
+              - WEBDL-1080p
+              - WEBRip-1080p
+          - name: Bluray-1080p
+        upgrade:
+          allowed: true
+          until_quality: WEB 1080p
+
+    custom_formats:
+      - trash_ids:
+          - c9eafd50846d299b862ca9bb6ea91950
+        assign_scores_to:
+          - name: HD-1080p-x265
+            score: 1000
