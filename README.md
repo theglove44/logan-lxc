@@ -1,40 +1,170 @@
 # Logan LXC Mediaserver
 
-A lightweight, reproducible Docker Compose stack for a personal media server (Jellyfin/Plex, Sonarr, Radarr, SABnzbd, Prowlarr, Overseerr/Bazarr, Recyclarr) plus helper scripts for recovery and key checks.
+Reproducible Docker Compose stack for a personal media server with an internal dashboard, monitoring, automated updates, and backups (local + Google Drive offsite).
+
+Core apps: Jellyfin, Plex, Sonarr, Radarr, SABnzbd, Prowlarr, Overseerr, Bazarr, Tautulli, Filebrowser, Dozzle
+
+Observability: Prometheus, node-exporter, cAdvisor, Grafana (provisioned dashboards), Homepage dashboard
+
+Ops: Watchtower (Discord notifications), borgmatic (local encrypted backups), rclone (Google Drive sync)
+
+---
 
 ## Prerequisites
-- Docker and Docker Compose
-- SSH key access to GitHub (`git@github.com:theglove44/logan-lxc.git`)
-- Host directories mapped in `compose.yml` exist (e.g. `/opt/mediaserver`, `/mnt/storage/data`)
+- Docker + Docker Compose
+- Host directories from `compose.yml` exist (e.g. `/opt/mediaserver`, `/mnt/storage/data`, `/mnt/backup`)
+- A `.env` file with your user IDs, timezone, and API keys (see below)
 
 ## Quick Start
-1. Clone the repo:
-   ```
-   git clone git@github.com:theglove44/logan-lxc.git
-   cd logan-lxc
-   ```
-2. Create `.env` from example and adjust values:
-   ```
-   cp .env.example .env
-   ```
-3. Bring the stack up:
-   ```
-   docker compose up -d
-   ```
-4. Access services (defaults): Jellyfin `:8096`, SABnzbd `:8080`, Sonarr `:8989`, Radarr `:7878`, Overseerr `:5155` (mapped to `5055`). Plex runs in host network.
+1) Clone
+```
+git clone git@github.com:theglove44/logan-lxc.git
+cd logan-lxc
+```
+2) Configure env
+```
+cp .env.example .env
+# edit .env to set PUID/PGID/TZ/UMASK, HOST_LAN, and API keys
+```
+3) Bring up the main stack
+```
+docker compose up -d
+```
+4) Bring up the dashboard/monitoring addons
+```
+docker compose -f homepage-stack.yml up -d
+```
 
-## Structure
-- `compose.yml` — Services and volumes
-- `scripts/` — Utilities:
-  - `print-and-test-apikeys.sh`: reads API keys from `/opt/mediaserver/{sonarr,radarr}/config.xml` and tests `/api/v3/system/status`.
-  - `recover-sonarr.sh` / `recover-radarr.sh`: restore appdata from an old host via rsync; review host/path before use.
-- `recyclarr/configs/` — Recyclarr config templates
+## Services & URLs (defaults)
+- Homepage: http://HOST_LAN:3000 (stack: `homepage-stack.yml`)
+- Jellyfin: http://HOST_LAN:8096
+- Plex: http://HOST_LAN:32400 (host network)
+- Overseerr: http://HOST_LAN:5155 (container 5055)
+- SABnzbd: http://HOST_LAN:8080
+- Sonarr: http://HOST_LAN:8989
+- Radarr: http://HOST_LAN:7878
+- Prowlarr: http://HOST_LAN:9696
+- Bazarr: http://HOST_LAN:6767
+- Tautulli: http://HOST_LAN:8181
+- Filebrowser: http://HOST_LAN:8081
+- Dozzle (logs): http://HOST_LAN:9999
+- Prometheus: http://HOST_LAN:9090
+- Grafana: http://HOST_LAN:3001 (admin/admin by default; anon viewer enabled)
+- node-exporter: http://HOST_LAN:9100/metrics
+- cAdvisor: http://HOST_LAN:8082
 
 ## Configuration
-- Copy and edit `.env.example` to `.env` (kept out of git). Do not commit real secrets.
-- Recyclarr: copy `recyclarr/configs/config.example.yaml` to `recyclarr/configs/config.yaml` and set your API keys or adjust to source from env.
+- `.env` (not committed)
+  - PUID, PGID, TZ, UMASK
+  - HOST_LAN (LAN IP/hostname of the host)
+  - HOMEPAGE_VAR_HOST_LAN (same as HOST_LAN for dashboard links)
+  - HOMEPAGE_VAR_SONARR_API_KEY, HOMEPAGE_VAR_RADARR_API_KEY, HOMEPAGE_VAR_SAB_API_KEY
+  - HOMEPAGE_VAR_PLEX_TOKEN (auto-detected and saved)
+  - HOMEPAGE_VAR_TAUTULLI_API_KEY (auto-detected by Tautulli)
+  - HOMEPAGE_VAR_GRAFANA_USERNAME=admin, HOMEPAGE_VAR_GRAFANA_PASSWORD=admin (optional; anon viewer is enabled)
+  - BORG_PASSPHRASE (encryption passphrase for Borg repository)
+
+- Homepage config (`homepage/config/`)
+  - `services.yaml` controls tiles and widgets; uses `{{HOMEPAGE_VAR_*}}` env vars
+  - To apply changes: `docker compose -f homepage-stack.yml up -d homepage`
+
+- Grafana
+  - Provisioned dashboards and datasources under `grafana/`
+  - Anonymous viewer access enabled; admin user is `admin/admin` (change it!)
+
+## Monitoring
+- Prometheus scrapes: node-exporter, cAdvisor, and any configured exporters
+- Grafana dashboards included: system overview, cAdvisor, Homepage status
+- Homepage shows live status via widgets for Sonarr/Radarr/SAB and Grafana
+
+## Backups (local)
+Tooling: borgmatic (encrypted, deduplicated)
+
+- Container: `mediaserver-backup` (ghcr.io/borgmatic-collective/borgmatic)
+- Repository: `/mnt/backup/mediaserver` (mounted from host)
+- Schedule: 03:30 daily via container crond (see `backup/config/crontab.txt`)
+- Config: `backup/config/config.yaml` (tracked in Git)
+- Excludes: `backup/config/excludes.txt`
+- Hooks: SQLite snapshot before backup (`backup/config/hooks.d/pre-backup.sh`)
+
+Common operations
+```
+# Validate config
+docker exec mediaserver-backup borgmatic config validate
+
+# Run a backup now
+docker exec mediaserver-backup borgmatic -v 0 --stats
+
+# List archives / repo info
+docker exec mediaserver-backup borgmatic list
+docker exec mediaserver-backup borgmatic info
+```
+
+Restore (example)
+```
+# List archives and pick one
+docker exec -it mediaserver-backup borgmatic list
+
+# Extract a path from an archive to /restore (bind-mount as needed)
+docker exec -it mediaserver-backup sh -lc \
+  'borgmatic extract --archive latest --destination /restore --path home/…'
+```
+Important: Keep your `BORG_PASSPHRASE` safe. For repokey mode, export the Borg key and store it offline.
+
+## Offsite backup (Google Drive)
+Tooling: rclone sidecar with cron
+
+- Container: `rclone_backup` (Alpine + crond + rclone)
+- Schedule: 04:10 daily (`backup/rclone/crontab.txt`)
+- Local path synced: `/mnt/backup/mediaserver` → `gdrive:mediaserver-borg`
+- Configure rclone (one-time):
+```
+docker run -it --rm \
+  -v /opt/mediaserver/backup/rclone:/config/rclone \
+  rclone/rclone config
+```
+Verify and test
+```
+docker exec rclone_backup rclone about gdrive:
+docker exec rclone_backup rclone size gdrive:mediaserver-borg
+docker exec -it rclone_backup sh -lc 'rclone sync /data gdrive:mediaserver-borg --progress'
+```
+
+## Automated updates (Watchtower)
+- Container: `watchtower` (Discord notifications via Shoutrrr)
+- Schedule: 04:00 daily, rolling restarts, cleans old images
+- Notifications: Daily summary and update reports to Discord
+- Scope: All containers by default; to restrict by label, add `--label-enable` and label services with `com.centurylinklabs.watchtower.enable=true`
+
+## Repository layout
+- `compose.yml` — Core services
+- `homepage-stack.yml` — Homepage + monitoring add-ons
+- `homepage/config/**` — Dashboard config (tracked)
+- `grafana/**` — Provisioning and dashboards
+- `prometheus/prometheus.yml` — Prometheus config
+- `backup/config/**` — borgmatic config, excludes, hooks (tracked)
+- `backup/rclone/crontab.txt` — rclone schedule (tracked)
+- `.env` — secrets and instance values (ignored)
+
+## Version control policy
+- Tracked: compose files, Homepage configs, Grafana provisioning, `backup/config/**`, `backup/rclone/crontab.txt`
+- Ignored: `.env`, appdata (service config dirs), `prometheus/data/`, Borg repo contents (`/mnt/backup`), `backup/rclone/rclone.conf` (rclone credentials)
+
+## Maintenance cheatsheet
+```
+# Update images now (in addition to Watchtower schedule)
+docker compose pull && docker compose up -d
+docker compose -f homepage-stack.yml pull && docker compose -f homepage-stack.yml up -d
+
+# Restart a single service
+docker compose up -d sonarr
+
+# View logs
+docker logs -f sonarr
+docker logs -f watchtower
+```
 
 ## Notes
-- The repo intentionally ignores appdata (volumes) to avoid committing large, mutable data and secrets.
-- If migrating, update the old host/port/path variables inside recovery scripts before running.
-- Hardware transcoding is enabled via `/dev/dri`; remove if not needed.
+- Internal-only access: Homepage tiles use `HOMEPAGE_VAR_HOST_LAN`; links are LAN URLs.
+- Grafana admin defaults are for local use; change the password or disable anonymous viewer for stricter access.
+- Backups focus on app configuration and databases. Large media libraries are typically not backed up here (re-acquirable).
