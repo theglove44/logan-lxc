@@ -290,8 +290,8 @@ services:
     volumes:
       # Borgmatic config & hooks
       - ./backup/config:/etc/borgmatic:ro
-      # Provide crontab where the image expects it
-      - ./backup/config/crontab.txt:/etc/borgmatic.d/crontab.txt:ro
+      # Provide cron schedule to the container
+      - ./backup/config/crontab.txt:/etc/crontabs/root:ro
       # Borg runtime state
       - borg-cache:/root/.cache/borg
       - borg-config:/root/.config/borg
