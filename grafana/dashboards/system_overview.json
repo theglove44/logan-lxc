@@ -1,0 +1,86 @@
+{
+  "uid": "system_overview",
+  "title": "System Overview",
+  "tags": ["overview"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "10s",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "CPU Usage %",
+      "gridPos": {"x": 0, "y": 0, "w": 6, "h": 6},
+      "options": {"reduceOptions": {"calcs": ["last"], "fields": "", "values": false}, "orientation": "auto"},
+      "targets": [
+        {
+          "expr": "100 * (1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])))",
+          "legendFormat": "cpu"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "percent"}, "overrides": []}
+    },
+    {
+      "type": "stat",
+      "title": "Memory Usage %",
+      "gridPos": {"x": 6, "y": 0, "w": 6, "h": 6},
+      "options": {"reduceOptions": {"calcs": ["last"], "fields": "", "values": false}},
+      "targets": [
+        {
+          "expr": "100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))",
+          "legendFormat": "mem"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "percent"}, "overrides": []}
+    },
+    {
+      "type": "stat",
+      "title": "Root Disk Usage %",
+      "gridPos": {"x": 12, "y": 0, "w": 6, "h": 6},
+      "options": {"reduceOptions": {"calcs": ["last"], "fields": "", "values": false}},
+      "targets": [
+        {
+          "expr": "100 * (1 - (node_filesystem_avail_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}))",
+          "legendFormat": "root"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "percent"}, "overrides": []}
+    },
+    {
+      "type": "stat",
+      "title": "Containers (cAdvisor seen)",
+      "gridPos": {"x": 18, "y": 0, "w": 6, "h": 6},
+      "options": {"reduceOptions": {"calcs": ["last"], "fields": "", "values": false}},
+      "targets": [
+        {
+          "expr": "count(container_last_seen{image!=\"\"})",
+          "legendFormat": "containers"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Homepage CPU (cAdvisor)",
+      "gridPos": {"x": 0, "y": 6, "w": 12, "h": 8},
+      "fieldConfig": {"defaults": {"unit": "percent"}, "overrides": []},
+      "targets": [
+        {
+          "expr": "100 * sum(rate(container_cpu_usage_seconds_total{name=~\".*/?homepage.*\"}[5m]))",
+          "legendFormat": "homepage cpu"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Homepage Memory (bytes)",
+      "gridPos": {"x": 12, "y": 6, "w": 12, "h": 8},
+      "fieldConfig": {"defaults": {"unit": "bytes"}, "overrides": []},
+      "targets": [
+        {
+          "expr": "sum(container_memory_usage_bytes{name=~\".*/?homepage.*\"})",
+          "legendFormat": "homepage mem"
+        }
+      ]
+    }
+  ]
+}

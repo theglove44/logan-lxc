@@ -29,6 +29,9 @@ recyclarr/repositories/
 **/Backups/**
 transcode/
 
+# Prometheus runtime data
+prometheus/data/
+
 # OS/editor
 .DS_Store
 Thumbs.db

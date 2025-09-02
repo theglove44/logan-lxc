@@ -1,0 +1,67 @@
+- Apps:
+    - Jellyfin:
+        href: http://{{HOMEPAGE_VAR_HOST_LAN}}:8096
+        icon: jellyfin.png
+        description: Media streaming
+        ping: http://jellyfin:8096
+    - Plex:
+        href: http://{{HOMEPAGE_VAR_HOST_LAN}}:32400
+        icon: plex.png
+        description: Media streaming
+        ping: http://{{HOMEPAGE_VAR_HOST_LAN}}:32400
+    - Overseerr:
+        href: http://{{HOMEPAGE_VAR_HOST_LAN}}:5155
+        icon: overseerr.png
+        ping: http://overseerr:5055
+    - Prowlarr:
+        href: http://{{HOMEPAGE_VAR_HOST_LAN}}:9696
+        icon: prowlarr.png
+        ping: http://prowlarr:9696
+    - Sonarr:
+        href: http://{{HOMEPAGE_VAR_HOST_LAN}}:8989
+        icon: sonarr.png
+        description: TV Indexer
+        ping: http://sonarr:8989
+        widget:
+          type: sonarr
+          url: http://sonarr:8989
+          key: "{{HOMEPAGE_VAR_SONARR_API_KEY}}"
+    - Radarr:
+        href: http://{{HOMEPAGE_VAR_HOST_LAN}}:7878
+        icon: radarr.png
+        description: Movie Indexer
+        ping: http://radarr:7878
+        widget:
+          type: radarr
+          url: http://radarr:7878
+          key: "{{HOMEPAGE_VAR_RADARR_API_KEY}}"
+
+- Downloads:
+    - SABnzbd:
+        href: http://{{HOMEPAGE_VAR_HOST_LAN}}:8080
+        icon: sabnzbd.png
+        widget:
+          type: sabnzbd
+          url: http://sabnzbd:8080
+          key: "{{HOMEPAGE_VAR_SAB_API_KEY}}"
+
+- Monitoring:
+    - Grafana:
+        href: http://{{HOMEPAGE_VAR_HOST_LAN}}:3001/d/system_overview?orgId=1
+        icon: grafana.png
+    - Homepage Status:
+        href: http://{{HOMEPAGE_VAR_HOST_LAN}}:3001/d/homepage_status?orgId=1
+        icon: grafana.png
+    - Prometheus:
+        href: http://{{HOMEPAGE_VAR_HOST_LAN}}:9090
+        icon: prometheus.png
+    - Dozzle (Logs):
+        href: http://{{HOMEPAGE_VAR_HOST_LAN}}:9999
+        icon: docker.png
+
+- Files:
+    - File Browser:
+        href: http://{{HOMEPAGE_VAR_HOST_LAN}}:8081
+        icon: filebrowser.png
+        description: Browse server file structure
+        ping: http://filebrowser:80

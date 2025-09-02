@@ -1,0 +1,134 @@
+name: homepage-stack
+
+# --- HOMEPAGE + METRICS ADD-ONS ---
+services:
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    restart: unless-stopped
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - HOMEPAGE_ALLOWED_HOSTS=100.76.120.49:3000,10.0.0.100:3000,localhost,127.0.0.1,10.0.0.100
+      - HOMEPAGE_LOG_LEVEL=debug
+    volumes:
+      - /opt/mediaserver/homepage/config:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    env_file: .env
+    ports:
+      - "3000:3000"
+
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: dozzle
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "9999:8080"
+
+  filebrowser:
+    image: filebrowser/filebrowser:latest
+    container_name: filebrowser
+    restart: unless-stopped
+    user: "${PUID}:${PGID}"
+    environment:
+      - TZ=${TZ}
+    volumes:
+      - /mnt/storage/data:/srv
+      - /opt/mediaserver/filebrowser:/database
+      - /opt/mediaserver/filebrowser/settings.json:/config/settings.json
+    ports:
+      - "8081:80"
+
+  # --- METRICS CORE ---
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    volumes:
+      - /opt/mediaserver/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - /opt/mediaserver/prometheus:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=15d"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "9090:9090"
+
+  blackbox_exporter:
+    image: prom/blackbox-exporter:latest
+    container_name: blackbox_exporter
+    restart: unless-stopped
+    ports:
+      - "9115:9115"
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    user: "${PUID}:${PGID}"
+    environment:
+      - GF_SERVER_DOMAIN=${HOST_LAN:-localhost}
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - /opt/mediaserver/grafana:/var/lib/grafana
+      - /opt/mediaserver/grafana/provisioning:/etc/grafana/provisioning
+      - /opt/mediaserver/grafana/dashboards:/var/lib/grafana/dashboards
+    ports:
+      - "3001:3000"
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    restart: unless-stopped
+    privileged: true
+    command:
+      - "--docker_only=true"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /sys:/sys:ro
+    ports:
+      - "8082:8080"
+
+  node_exporter:
+    image: quay.io/prometheus/node-exporter:latest
+    container_name: node_exporter
+    restart: unless-stopped
+    # Run in default bridge network so Prometheus can scrape via service name
+    command:
+      - "--path.rootfs=/host"
+      - "--collector.filesystem"
+      - "--collector.meminfo"
+      - "--collector.cpu"
+      - "--collector.diskstats"
+      - "--collector.netstat"
+    volumes:
+      - /:/host:ro,rslave
+    ports:
+      - "9100:9100"
+
+  # --- DOWNLOADERS METRICS (pick what you run) ---
+
+  sabnzbd_exporter:
+    image: ghcr.io/onedr0p/exportarr:latest
+    container_name: sab_exporter
+    restart: unless-stopped
+    environment:
+      - PORT=9707
+      - URL=http://sabnzbd:8080
+      - API_KEY=${HOMEPAGE_VAR_SAB_API_KEY}
+    command: ["sabnzbd"]
+    ports:
+      - "9707:9707"
+
+networks:
+  default:
+    name: media_net
+    external: true
+    # Keeps LAN/Tailscale exposure simple via host IP bindings above

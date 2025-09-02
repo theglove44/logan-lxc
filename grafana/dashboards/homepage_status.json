@@ -1,0 +1,38 @@
+{
+  "uid": "homepage_status",
+  "title": "Homepage Status",
+  "tags": ["uptime"],
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "15s",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Homepage Up",
+      "gridPos": {"x": 0, "y": 0, "w": 6, "h": 6},
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["last"], "fields": "", "values": false}},
+      "targets": [
+        {"expr": "max(probe_success{instance=\"http://homepage:3000\"})", "legendFormat": "up"}
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Probe Duration",
+      "gridPos": {"x": 6, "y": 0, "w": 6, "h": 6},
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["last"], "fields": "", "values": false}},
+      "targets": [
+        {"expr": "max(probe_duration_seconds{instance=\"http://homepage:3000\"})", "legendFormat": "duration"}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP Status Code",
+      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 6},
+      "targets": [
+        {"expr": "max(probe_http_status_code{instance=\"http://homepage:3000\"})", "legendFormat": "status"}
+      ]
+    }
+  ]
+}

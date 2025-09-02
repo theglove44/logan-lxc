@@ -1,0 +1,14 @@
+{
+  "port": 80,
+  "baseURL": "",
+  "address": "",
+  "log": "stdout",
+  "database": "/database/filebrowser.db",
+  "root": "/srv",
+  "scope": "/srv",
+  "allowCommands": true,
+  "allowEdit": true,
+  "allowNew": true,
+  "commands": ["zip","unzip"],
+  "shell": "sh"
+}

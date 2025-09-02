@@ -154,7 +154,7 @@ services:
       - sabnzbd
       - prowlarr
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8989/api/v3/system/status"]
+      test: ["CMD", "bash", "-O", "extglob", "-c", "curl -fsS 'http://localhost:8989/api/v3/system/status?apikey=${HOMEPAGE_VAR_SONARR_API_KEY}' >/dev/null"]
       interval: 30s
       timeout: 5s
       retries: 10
@@ -180,7 +180,7 @@ services:
       - sabnzbd
       - prowlarr
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7878/api/v3/system/status"]
+      test: ["CMD", "bash", "-O", "extglob", "-c", "curl -fsS 'http://localhost:7878/api/v3/system/status?apikey=${HOMEPAGE_VAR_RADARR_API_KEY}' >/dev/null"]
       interval: 30s
       timeout: 5s
       retries: 10
