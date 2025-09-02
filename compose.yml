@@ -235,6 +235,28 @@ services:
     depends_on:
       - jellyfin
 
+  tautulli:
+    image: lscr.io/linuxserver/tautulli:latest
+    container_name: tautulli
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - /opt/mediaserver/tautulli:/config
+    ports:
+      - "8181:8181"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    restart: unless-stopped
+    depends_on:
+      - plex
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8181/" ]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+
   watchtower:
     image: containrrr/watchtower
     container_name: watchtower

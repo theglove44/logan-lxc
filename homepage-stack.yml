@@ -74,6 +74,8 @@ services:
       - GF_SERVER_DOMAIN=${HOST_LAN:-localhost}
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
     volumes:
       - /opt/mediaserver/grafana:/var/lib/grafana
       - /opt/mediaserver/grafana/provisioning:/etc/grafana/provisioning

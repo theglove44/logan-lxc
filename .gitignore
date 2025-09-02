@@ -18,6 +18,7 @@ sonarr/
 recyclarr/logs/
 recyclarr/configs/config.yaml
 recyclarr/repositories/
+tautulli/
 
 # Common noise
 *.pid

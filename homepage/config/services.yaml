@@ -9,6 +9,14 @@
         icon: plex.png
         description: Media streaming
         ping: http://{{HOMEPAGE_VAR_HOST_LAN}}:32400
+        widget:
+          type: plex
+          url: http://{{HOMEPAGE_VAR_HOST_LAN}}:32400
+          key: "{{HOMEPAGE_VAR_PLEX_TOKEN}}"
+          fields:
+            - streams
+            - movies
+            - tv
     - Overseerr:
         href: http://{{HOMEPAGE_VAR_HOST_LAN}}:5155
         icon: overseerr.png
@@ -49,6 +57,27 @@
     - Grafana:
         href: http://{{HOMEPAGE_VAR_HOST_LAN}}:3001/d/system_overview?orgId=1
         icon: grafana.png
+        widget:
+          type: grafana
+          version: 2
+          url: http://grafana:3000
+          username: "{{HOMEPAGE_VAR_GRAFANA_USERNAME}}"
+          password: "{{HOMEPAGE_VAR_GRAFANA_PASSWORD}}"
+          fields:
+            - dashboards
+            - datasources
+            - totalalerts
+            - alertstriggered
+    - Tautulli (Plex Streams):
+        href: http://{{HOMEPAGE_VAR_HOST_LAN}}:8181
+        icon: tautulli.png
+        widget:
+          type: tautulli
+          url: http://tautulli:8181
+          key: "{{HOMEPAGE_VAR_TAUTULLI_API_KEY}}"
+          enableUser: true
+          showEpisodeNumber: true
+          expandOneStreamToTwoRows: false
     - Homepage Status:
         href: http://{{HOMEPAGE_VAR_HOST_LAN}}:3001/d/homepage_status?orgId=1
         icon: grafana.png
