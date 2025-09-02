@@ -277,6 +277,7 @@ services:
       --rolling-restart            
       --stop-timeout 60s
       --schedule "0 0 4 * * *"     
+      --notification-template '{{.Report}}'
     restart: unless-stopped
 
   backup:
