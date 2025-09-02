@@ -307,6 +307,22 @@ services:
       - /tmp:rw,exec
       - /run:rw,exec
 
+  rclone_backup:
+    image: alpine:3.20
+    container_name: rclone_backup
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ}
+    volumes:
+      - /mnt/backup/mediaserver:/data:ro
+      - /opt/mediaserver/backup/rclone:/config/rclone
+      - ./backup/rclone/crontab.txt:/etc/crontabs/root:ro
+    command: >
+      sh -c "apk add --no-cache rclone tzdata >/dev/null \
+      && mkdir -p /etc/rclone \
+      && if [ -f /config/rclone/rclone.conf ]; then cp /config/rclone/rclone.conf /etc/rclone/rclone.conf; else echo 'rclone.conf missing; run rclone config'; fi \
+      && crond -f -d 8"
+
 volumes:
   borg-cache:
   borg-config:

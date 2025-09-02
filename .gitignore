@@ -2,11 +2,13 @@
 .env
 .vscode/
 backup/*
-# Track only backup/config/**, keep rest ignored
+# Track only backup/config/** and backup/rclone/crontab.txt; keep rest ignored
 !backup/config/
 !backup/config/**
+!backup/rclone/
+!backup/rclone/crontab.txt
 # Keep rclone credentials/private files out of Git
-backup/rclone/
+backup/rclone/rclone.conf
 backup/config/rclone.conf
 
 # Appdata folders (volumes) — exclude from VCS

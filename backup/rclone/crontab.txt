@@ -1,0 +1,3 @@
+# min hour day month weekday  command
+# Nightly sync to Google Drive remote "gdrive" (configure with: docker run --rm -it -v /opt/mediaserver/backup/rclone:/config/rclone rclone/rclone config)
+10 4 * * * /usr/bin/rclone sync /data gdrive:mediaserver-borg --fast-list --transfers 4 --checkers 8 --drive-stop-on-upload-limit --bwlimit 8M --log-level INFO --log-file /var/log/rclone.log
