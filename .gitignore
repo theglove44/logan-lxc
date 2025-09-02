@@ -1,7 +1,13 @@
 # Never commit secrets or heavy appdata
 .env
 .vscode/
-backup/
+backup/*
+# Track only backup/config/**, keep rest ignored
+!backup/config/
+!backup/config/**
+# Keep rclone credentials/private files out of Git
+backup/rclone/
+backup/config/rclone.conf
 
 # Appdata folders (volumes) — exclude from VCS
 bazarr/

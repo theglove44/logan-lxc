@@ -1,0 +1,32 @@
+repositories:
+  - path: ${BORG_REPOSITORY}
+
+source_directories:
+  - /backup/mediaserver          # your configs + compose
+  - /run/sqlite-snapshots        # pre-backup sqlite snapshots
+
+exclude_from:
+  - /etc/borgmatic/excludes.txt
+
+one_file_system: false
+
+archive_name_format: "{hostname}-{now:%Y-%m-%d_%H-%M}"
+compression: auto,zstd
+
+# Retention policy
+keep_daily: 7
+keep_weekly: 4
+keep_monthly: 6
+keep_yearly: 2
+
+# Consistency checks (new schema format)
+checks:
+  - name: repository
+  - name: archives
+check_last: 12
+
+# Hooks (use deprecated keys for compatibility with borgmatic 1.8.x)
+before_backup:
+  - /etc/borgmatic/hooks.d/pre-backup.sh
+after_backup:
+  - /etc/borgmatic/hooks.d/post-backup.sh
