@@ -5,7 +5,7 @@
         description: Media streaming
         ping: http://jellyfin:8096
     - Plex:
-        href: http://{{HOMEPAGE_VAR_HOST_LAN}}:32400
+        href: https://app.plex.tv/desktop
         icon: plex.png
         description: Media streaming
         ping: http://{{HOMEPAGE_VAR_HOST_LAN}}:32400
