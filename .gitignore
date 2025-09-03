@@ -31,6 +31,7 @@ tautulli/
 # Common noise
 *.pid
 *.db*
+security/fail2ban/db/
 *.log
 **/logs/**
 **/log/**

@@ -257,6 +257,24 @@ services:
       timeout: 5s
       retries: 10
 
+  fail2ban:
+    image: crazymax/fail2ban:latest
+    container_name: fail2ban
+    network_mode: "host"          # manage iptables in the host namespace
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      - TZ=${TZ}
+      - F2B_LOG_TARGET=STDOUT
+      - F2B_LOG_LEVEL=INFO
+    volumes:
+      # Fail2ban config (filters, jails, state)
+      - ./security/fail2ban:/data
+      # Map the current Plex log file to a space-free path inside the container
+      - /opt/mediaserver/plex/config/Library/Application Support/Plex Media Server/Logs/Plex Media Server.log:/var/log/plexms/plexms.log:ro
+    restart: unless-stopped
+
   watchtower:
     image: containrrr/watchtower
     container_name: watchtower
