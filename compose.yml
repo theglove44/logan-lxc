@@ -41,9 +41,10 @@ services:
       - PUID=1000                       # <-- set to your media user ID
       - PGID=1000                       # <-- set to your media group ID
       - UMASK=002
-      # Optional first-run claim token (remove after first start or leave empty)
-      # Get one from https://plex.tv/claim while logged in
-      # - PLEX_CLAIM=claim-xxxxxxxxxxxxxxxxxxxx
+      # Optional: claim token to (re)claim the server after auth resets
+      # Get one from https://plex.tv/claim while logged in (2FA enabled)
+      # Tip: set `PLEX_CLAIM=claim-xxxx` in `.env`, then restart just the plex service
+      - PLEX_CLAIM=${PLEX_CLAIM:-}
     volumes:
       - /opt/mediaserver/plex/config:/config     # <-- change to your preferred config path
       - /mnt/storage/data/media:/media                # <-- root of your media library (or split by type)
