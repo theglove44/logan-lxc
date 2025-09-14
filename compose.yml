@@ -288,15 +288,30 @@ services:
       - WATCHTOWER_NOTIFICATIONS_LEVEL=info        # startup + updates + warnings/errors
       - WATCHTOWER_NOTIFICATION_REPORT=true        # send a summary every run (even 0 updates)
       - WATCHTOWER_NOTIFICATION_TITLE_TAG=watchtower@${HOSTNAME}
+      # Clear, human-friendly report listing names instead of IDs
+      - |
+        WATCHTOWER_NOTIFICATION_TEMPLATE={{- if .Report -}}{{- with .Report -}}
+          {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Failed}} Failed
+          {{- range .Updated}}
+        - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
+          {{- end}}
+          {{- range .Fresh}}
+        - {{.Name}} ({{.ImageName}}): {{.State}}
+          {{- end}}
+          {{- range .Failed}}
+        - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
+          {{- end}}
+          {{- range .Skipped}}
+        - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
+          {{- end}}
+        {{- end -}}{{- end -}}
       - WATCHTOWER_INCLUDE_RESTARTING=true         # scan restarting containers too
       - WATCHTOWER_INCLUDE_STOPPED=true            # scan stopped containers for image updates
-      - WATCHTOWER_NOTIFICATION_TITLE_TAG=watchtower@logan-lxc
     command: >
       --cleanup                    
       --rolling-restart            
       --stop-timeout 60s
       --schedule "0 0 4 * * *"     
-      --notification-template '{{.Report}}'
     restart: unless-stopped
 
   backup:
