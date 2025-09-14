@@ -35,6 +35,45 @@ docker compose up -d
 docker compose -f homepage-stack.yml up -d
 ```
 
+## Mediaserver CLI (ms)
+To simplify day-to-day operations, use the `ms` helper script.
+
+Install once
+```
+sudo ln -s /opt/mediaserver/scripts/ms /usr/local/bin/ms
+# or add to PATH: echo 'export PATH=/opt/mediaserver/scripts:$PATH' >> ~/.bashrc && exec $SHELL
+```
+
+Common usage
+```
+# Start/stop stacks
+ms up core|homepage|all
+ms down core|homepage|all
+
+# Status
+ms ps all
+
+# Service ops
+ms restart sonarr
+ms logs radarr
+ms shell prowlarr            # interactive shell (bash or sh)
+ms exec sonarr curl -s localhost:8989
+
+# Updates
+ms pull core                 # or homepage/all or a single service name
+ms update all                # pull + recreate
+
+# Jobs
+ms recyclarr                 # run recyclarr sync once
+ms backup                    # run a borgmatic backup once
+ms watchtower                # trigger a one-time watchtower scan
+```
+
+Help
+```
+ms help
+```
+
 ## Services & URLs (defaults)
 - Homepage: http://HOST_LAN:3000 (stack: `homepage-stack.yml`)
 - Jellyfin: http://HOST_LAN:8096
@@ -162,6 +201,11 @@ docker compose up -d sonarr
 # View logs
 docker logs -f sonarr
 docker logs -f watchtower
+
+# Same operations via the helper
+ms update all
+ms restart sonarr
+ms logs radarr
 ```
 
 ## Notes

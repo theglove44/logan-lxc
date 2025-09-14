@@ -1,0 +1,289 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ms: mediaserver helper CLI
+# Shortcuts for common docker compose actions across:
+#  - core stack: compose.yml
+#  - homepage stack: homepage-stack.yml
+
+# Resolve script directory even when invoked via symlink
+SOURCE=${BASH_SOURCE[0]}
+while [ -L "$SOURCE" ]; do
+  DIR=$(cd -P "$(dirname "$SOURCE")" && pwd)
+  SOURCE=$(readlink "$SOURCE")
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR=$(cd -P "$(dirname "$SOURCE")" && pwd)
+ROOT_DIR=$(cd -P "$SCRIPT_DIR/.." && pwd)
+cd "$ROOT_DIR"
+
+# Determine docker compose command
+if docker compose version >/dev/null 2>&1; then
+  DC=(docker compose)
+elif command -v docker-compose >/dev/null 2>&1; then
+  DC=(docker-compose)
+else
+  echo "Error: docker compose not found." >&2
+  exit 1
+fi
+
+CORE_FILE="compose.yml"
+HP_FILE="homepage-stack.yml"
+
+require_file() {
+  local f=$1
+  [[ -f "$f" ]] || { echo "Missing $f in $ROOT_DIR" >&2; exit 1; }
+}
+
+require_file "$CORE_FILE"
+require_file "$HP_FILE"
+
+# List services from a compose file
+services_in() {
+  "${DC[@]}" -f "$1" config --services 2>/dev/null || true
+}
+
+in_stack() {
+  local svc=$1
+  if services_in "$CORE_FILE" | grep -Fxq "$svc"; then
+    echo core
+  elif services_in "$HP_FILE" | grep -Fxq "$svc"; then
+    echo homepage
+  else
+    echo ""  # not found
+  fi
+}
+
+compose_for() {
+  local stack=$1
+  case "$stack" in
+    core) echo "$CORE_FILE" ;;
+    homepage|home) echo "$HP_FILE" ;;
+    *) echo "$CORE_FILE" ;;
+  esac
+}
+
+usage() {
+  cat <<EOF
+ms - mediaserver helper
+
+Usage:
+  ms up [core|homepage|all]         Start stack(s)
+  ms down [core|homepage|all]       Stop stack(s)
+  ms ps [core|homepage|all]         Show container status
+  ms restart <service>              Restart a service
+  ms logs <service>                 Tail logs for a service
+  ms exec <service> [cmd...]        Exec into a service (default: shell)
+  ms shell <service>                Open an interactive shell in a service
+  ms pull [core|homepage|all|svc]   Pull images
+  ms update [core|homepage|all]     Pull + recreate containers
+  ms recyclarr                      Run recyclarr sync (one-off)
+  ms backup                         Run a backup now (borgmatic)
+  ms watchtower                     Trigger watchtower once
+  ms help                           Show this help
+
+Examples:
+  ms up all
+  ms restart sonarr
+  ms logs jellyfin
+  ms shell prowlarr
+  ms pull homepage
+  ms update core
+EOF
+}
+
+start_stack() {
+  local f=$1
+  echo "Starting stack: $f"
+  "${DC[@]}" -f "$f" up -d
+}
+
+stop_stack() {
+  local f=$1
+  echo "Stopping stack: $f"
+  "${DC[@]}" -f "$f" down
+}
+
+ps_stack() {
+  local f=$1
+  echo "\n== $(basename "$f") =="
+  "${DC[@]}" -f "$f" ps
+}
+
+restart_service() {
+  local svc=$1
+  local stack
+  stack=$(in_stack "$svc")
+  [[ -n "$stack" ]] || { echo "Service '$svc' not found in any stack" >&2; exit 1; }
+  local f
+  f=$(compose_for "$stack")
+  echo "Restarting $svc (stack: $stack)"
+  "${DC[@]}" -f "$f" restart "$svc"
+}
+
+logs_service() {
+  local svc=$1
+  local stack
+  stack=$(in_stack "$svc")
+  [[ -n "$stack" ]] || { echo "Service '$svc' not found in any stack" >&2; exit 1; }
+  local f
+  f=$(compose_for "$stack")
+  echo "Tailing logs for $svc (Ctrl-C to stop)"
+  "${DC[@]}" -f "$f" logs -f --tail=300 "$svc"
+}
+
+exec_service() {
+  local svc=$1; shift || true
+  local stack
+  stack=$(in_stack "$svc")
+  [[ -n "$stack" ]] || { echo "Service '$svc' not found in any stack" >&2; exit 1; }
+  local f
+  f=$(compose_for "$stack")
+  if [[ $# -gt 0 ]]; then
+    "${DC[@]}" -f "$f" exec -it "$svc" "$@"
+  else
+    # Try bash, fall back to sh
+    if "${DC[@]}" -f "$f" exec -T "$svc" bash -lc 'exit 0' >/dev/null 2>&1; then
+      "${DC[@]}" -f "$f" exec -it "$svc" bash
+    else
+      "${DC[@]}" -f "$f" exec -it "$svc" sh
+    fi
+  fi
+}
+
+pull_target() {
+  local t=${1:-core}
+  case "$t" in
+    core) "${DC[@]}" -f "$CORE_FILE" pull ;;
+    homepage|home) "${DC[@]}" -f "$HP_FILE" pull ;;
+    all) "${DC[@]}" -f "$CORE_FILE" pull; "${DC[@]}" -f "$HP_FILE" pull ;;
+    *)
+      # assume service name
+      local stack
+      stack=$(in_stack "$t")
+      [[ -n "$stack" ]] || { echo "Unknown target or service '$t'" >&2; exit 1; }
+      local f
+      f=$(compose_for "$stack")
+      "${DC[@]}" -f "$f" pull "$t"
+      ;;
+  esac
+}
+
+update_target() {
+  local t=${1:-core}
+  case "$t" in
+    core)
+      "${DC[@]}" -f "$CORE_FILE" pull
+      "${DC[@]}" -f "$CORE_FILE" up -d
+      ;;
+    homepage|home)
+      "${DC[@]}" -f "$HP_FILE" pull
+      "${DC[@]}" -f "$HP_FILE" up -d
+      ;;
+    all)
+      "${DC[@]}" -f "$CORE_FILE" pull
+      "${DC[@]}" -f "$CORE_FILE" up -d
+      "${DC[@]}" -f "$HP_FILE" pull
+      "${DC[@]}" -f "$HP_FILE" up -d
+      ;;
+    *) echo "Unknown target: $t" >&2; exit 1 ;;
+  esac
+}
+
+recyclarr_run() {
+  if ! services_in "$CORE_FILE" | grep -Fxq recyclarr; then
+    echo "recyclarr not defined in $CORE_FILE" >&2
+    exit 1
+  fi
+  echo "Running recyclarr sync (one-off)"
+  "${DC[@]}" -f "$CORE_FILE" run --rm recyclarr
+}
+
+backup_now() {
+  local svc_service="backup"
+  if ! services_in "$CORE_FILE" | grep -Fxq "$svc_service"; then
+    echo "backup service not defined in $CORE_FILE" >&2
+    exit 1
+  fi
+  echo "Running borgmatic backup (one-off)"
+  "${DC[@]}" -f "$CORE_FILE" run --rm "$svc_service"
+}
+
+watchtower_once() {
+  local name="watchtower"
+  # Prefer exec if container exists and is running
+  if docker ps --format '{{.Names}}' | grep -Fxq "$name"; then
+    echo "Triggering watchtower run-once via exec"
+    docker exec "$name" /watchtower --run-once
+  else
+    echo "Running ephemeral watchtower scan"
+    docker run --rm -v /var/run/docker.sock:/var/run/docker.sock containrrr/watchtower --run-once --cleanup --rolling-restart
+  fi
+}
+
+cmd=${1:-help}
+case "$cmd" in
+  help|-h|--help) usage ;;
+  up)
+    case "${2:-core}" in
+      core) start_stack "$CORE_FILE" ;;
+      homepage|home) start_stack "$HP_FILE" ;;
+      all) start_stack "$CORE_FILE"; start_stack "$HP_FILE" ;;
+      *) echo "Unknown stack: $2" >&2; exit 1 ;;
+    esac
+    ;;
+  down)
+    case "${2:-core}" in
+      core) stop_stack "$CORE_FILE" ;;
+      homepage|home) stop_stack "$HP_FILE" ;;
+      all) stop_stack "$HP_FILE"; stop_stack "$CORE_FILE" ;;
+      *) echo "Unknown stack: $2" >&2; exit 1 ;;
+    esac
+    ;;
+  ps)
+    case "${2:-all}" in
+      core) ps_stack "$CORE_FILE" ;;
+      homepage|home) ps_stack "$HP_FILE" ;;
+      all) ps_stack "$CORE_FILE"; ps_stack "$HP_FILE" ;;
+      *) echo "Unknown stack: $2" >&2; exit 1 ;;
+    esac
+    ;;
+  restart)
+    [[ $# -ge 2 ]] || { echo "Usage: ms restart <service>" >&2; exit 1; }
+    restart_service "$2"
+    ;;
+  logs)
+    [[ $# -ge 2 ]] || { echo "Usage: ms logs <service>" >&2; exit 1; }
+    logs_service "$2"
+    ;;
+  exec)
+    [[ $# -ge 2 ]] || { echo "Usage: ms exec <service> [cmd...]" >&2; exit 1; }
+    svc=$2; shift 2 || true
+    exec_service "$svc" "$@"
+    ;;
+  shell)
+    [[ $# -ge 2 ]] || { echo "Usage: ms shell <service>" >&2; exit 1; }
+    exec_service "$2"
+    ;;
+  pull)
+    pull_target "${2:-core}"
+    ;;
+  update)
+    update_target "${2:-core}"
+    ;;
+  recyclarr)
+    recyclarr_run
+    ;;
+  backup)
+    backup_now
+    ;;
+  watchtower)
+    watchtower_once
+    ;;
+  *)
+    echo "Unknown command: $cmd" >&2
+    echo
+    usage
+    exit 1
+    ;;
+esac
