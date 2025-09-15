@@ -290,7 +290,7 @@ services:
       - WATCHTOWER_NOTIFICATION_TITLE_TAG=watchtower@${HOSTNAME}
       - WATCHTOWER_NO_STARTUP_MESSAGE=true         # suppress the initial "updates on <id>" line
       # Always send a readable summary with names (even when 0 updates)
-      - 'WATCHTOWER_NOTIFICATION_TEMPLATE={{- if .Report -}}{{- with .Report -}}{{len .Scanned}} scanned, {{len .Updated}} updated, {{len .Failed}} failed{{- if .Updated}}{{println}}Updated: {{- range $i, $u := .Updated}}{{- if $i}}, {{end -}}{{$u.Name}}{{- end}}{{- end -}}{{- if .Failed}}{{println}}Failed: {{- range $i, $f := .Failed}}{{- if $i}}, {{end -}}{{$f.Name}}{{- end}}{{- end -}}{{- if .Skipped}}{{println}}Skipped: {{- range $i, $s := .Skipped}}{{- if $i}}, {{end -}}{{$s.Name}}{{- end}}{{- end -}}{{- end -}}{{- end -}}'
+      - 'WATCHTOWER_NOTIFICATION_TEMPLATE={{- if .Report -}}{{- with .Report -}}{{len .Scanned}} scanned, {{len .Updated}} updated, {{len .Failed}} failed{{- if .Updated}}{{println}}Updated: {{- range $$i, $$u := .Updated}}{{- if $$i}}, {{end -}}{{$$u.Name}}{{- end}}{{- end -}}{{- if .Failed}}{{println}}Failed: {{- range $$i, $$f := .Failed}}{{- if $$i}}, {{end -}}{{$$f.Name}}{{- end}}{{- end -}}{{- if .Skipped}}{{println}}Skipped: {{- range $$i, $$s := .Skipped}}{{- if $$i}}, {{end -}}{{$$s.Name}}{{- end}}{{- end -}}{{- end -}}{{- end -}}'
       - WATCHTOWER_INCLUDE_RESTARTING=true         # scan restarting containers too
       - WATCHTOWER_INCLUDE_STOPPED=true            # scan stopped containers for image updates
     command: >
