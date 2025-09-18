@@ -33,13 +33,14 @@ services:
       retries: 5
 
   plex:
-    image: lscr.io/linuxserver/plex:latest
+    image: plexinc/pms-docker:public
     container_name: plex
     network_mode: "host"  # Plex works best on host network; avoids port juggling
     environment:
       - TZ=Europe/London                # <-- set your timezone
-      - PUID=1000                       # <-- set to your media user ID
-      - PGID=1000                       # <-- set to your media group ID
+      # Run the official image as the same host user/group for correct file perms
+      - PLEX_UID=${PUID}
+      - PLEX_GID=${PGID}
       - UMASK=002
       # Optional: claim token to (re)claim the server after auth resets
       # Get one from https://plex.tv/claim while logged in (2FA enabled)
