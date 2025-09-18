@@ -92,6 +92,26 @@ ms help
 - node-exporter: http://HOST_LAN:9100/metrics
 - cAdvisor: http://HOST_LAN:8082
 
+## Plex: official image and claiming
+This stack uses the official Plex image for the server to ensure timely updates and compatibility with mobile and TV apps.
+
+- Image: `plexinc/pms-docker:public` (stable/public builds)
+- Runs with host networking for best discovery and remote access
+- Maps `/config`, `/transcode`, and media paths as defined in `compose.yml`
+
+Claiming the server (first run or after auth resets)
+- Get a claim token while logged into Plex: https://plex.tv/claim
+- Set `PLEX_CLAIM=claim-XXXX` in `.env` temporarily
+- Restart just Plex: `docker compose up -d plex`
+- Once claimed, clear `PLEX_CLAIM` in `.env` and restart Plex again
+
+Keeping Plex updated
+- The `public` tag fetches current stable builds when the container is restarted. Watchtower will also recreate the container on its schedule.
+- If you have Plex Pass and want bleeding-edge builds, switch to `plexinc/pms-docker:beta` in `compose.yml`.
+
+Permissions
+- Plex runs as your host user/group by setting `PLEX_UID`/`PLEX_GID` from `.env` so it can read/write your media and metadata.
+
 ## Configuration
 - `.env` (not committed)
   - PUID, PGID, TZ, UMASK
