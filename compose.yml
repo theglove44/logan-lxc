@@ -261,6 +261,44 @@ services:
       timeout: 5s
       retries: 10
 
+  jellyplex-watched:
+    image: luigi311/jellyplex-watched:latest
+    container_name: jellyplex-watched
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      # App config
+      - DRYRUN=False
+      - DEBUG_LEVEL=DEBUG
+      - RUN_ONLY_ONCE=False
+      - SLEEP_DURATION=300
+      # Persist logs/marks to mounted path
+      - LOG_FILE=/config/log.log
+      - MARK_FILE=/config/mark.log
+      # Plex (host network container) — access via host gateway
+      - PLEX_BASEURL=http://host.docker.internal:32400
+      - PLEX_TOKEN=${HOMEPAGE_VAR_PLEX_TOKEN}
+      # Jellyfin (same compose network) — access via service name
+      - JELLYFIN_BASEURL=http://jellyfin:8096
+      - JELLYFIN_TOKEN=${JELLYFIN_TOKEN}
+      # Only Plex <-> Jellyfin syncing enabled by default
+      - SYNC_FROM_PLEX_TO_PLEX=False
+      - SYNC_FROM_PLEX_TO_EMBY=False
+      - SYNC_FROM_JELLYFIN_TO_EMBY=False
+      - SYNC_FROM_EMBY_TO_PLEX=False
+      - SYNC_FROM_EMBY_TO_JELLYFIN=False
+      - SYNC_FROM_EMBY_TO_EMBY=False
+    volumes:
+      - /opt/mediaserver/jellyplex-watched:/config
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    depends_on:
+      - plex
+      - jellyfin
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
   fail2ban:
     image: crazymax/fail2ban:latest
     container_name: fail2ban
