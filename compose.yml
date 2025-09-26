@@ -46,8 +46,10 @@ services:
       # Get one from https://plex.tv/claim while logged in (2FA enabled)
       # Tip: set `PLEX_CLAIM=claim-xxxx` in `.env`, then restart just the plex service
       - PLEX_CLAIM=${PLEX_CLAIM:-}
-      # Advertise direct LAN/Tailscale URLs so clients avoid relay/indirect
-      - ADVERTISE_IP=http://10.0.0.100:32400,http://100.76.120.49:32400
+      # Force clients (esp. tvOS/web) to prefer the local endpoints
+      # Include secure plex.direct for cert pinning and plain HTTP as fallback on LAN
+      - ADVERTISE_IP=https://10-0-0-100.9cc05cc3c9c14a059b2a0222e067e786.plex.direct:32400,http://10.0.0.100:32400
+      # (Removed ADVERTISE_IP; Plex will publish validated plex.direct URLs automatically)
     volumes:
       - /opt/mediaserver/plex/config:/config     # <-- change to your preferred config path
       - /mnt/storage/data/media:/media                # <-- root of your media library (or split by type)
