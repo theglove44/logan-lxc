@@ -35,5 +35,5 @@ http:
           - "PUT"
           - "DELETE"
         allowOriginList:
-          - "https://mjoln1r.com"
+          - "https://w0lverine.uk"
         maxAge: 86400

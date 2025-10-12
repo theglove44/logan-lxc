@@ -47,10 +47,10 @@ Traefik provides:
 | Type | Name | Value | TTL | Purpose |
 |------|------|-------|-----|---------|
 | A | @ | YOUR_SERVER_IP | 300 | Main domain points to your server |
-| CNAME | * | mjoln1r.com | 300 | **Wildcard** - handles ALL subdomains |
+| CNAME | * | w0lverine.uk | 300 | **Wildcard** - handles ALL subdomains |
 
 **✅ Your Setup is Perfect!**
-- The wildcard CNAME (`*`) automatically routes all subdomains (jellyfin.mjoln1r.com, plex.mjoln1r.com, etc.) to your main domain
+- The wildcard CNAME (`*`) automatically routes all subdomains (jellyfin.w0lverine.uk, plex.w0lverine.uk, etc.) to your main domain
 - No need for individual A records for each service
 - This is the most efficient and maintainable approach
 
@@ -68,8 +68,8 @@ A    homepage     YOUR_SERVER_IP    300
 **Verification:**
 ```bash
 # Test DNS resolution
-nslookup jellyfin.mjoln1r.com
-nslookup homepage.mjoln1r.com
+nslookup jellyfin.w0lverine.uk
+nslookup homepage.w0lverine.uk
 # Should resolve to YOUR_SERVER_IP
 ```
 
@@ -91,7 +91,7 @@ curl -f http://localhost:8080/api/overview
 Traefik will automatically generate SSL certificates on first request:
 ```bash
 # Trigger certificate generation
-curl -f https://jellyfin.mjoln1r.com
+curl -f https://jellyfin.w0lverine.uk
 
 # Check certificate status
 docker logs traefik | grep -i certificate
@@ -100,11 +100,11 @@ docker logs traefik | grep -i certificate
 ## Access URLs
 
 ### External Access (via Traefik)
-- **Homepage**: https://homepage.mjoln1r.com
-- **Jellyfin**: https://jellyfin.mjoln1r.com
-- **Plex**: https://plex.mjoln1r.com
-- **Grafana**: https://grafana.mjoln1r.com
-- **Traefik Dashboard**: https://traefik.mjoln1r.com (requires auth)
+- **Homepage**: https://homepage.w0lverine.uk
+- **Jellyfin**: https://jellyfin.w0lverine.uk
+- **Plex**: https://plex.w0lverine.uk
+- **Grafana**: https://grafana.w0lverine.uk
+- **Traefik Dashboard**: https://traefik.w0lverine.uk (requires auth)
 
 ### Internal Access (direct)
 - **Homepage**: http://YOUR_SERVER_IP:3000
@@ -131,7 +131,7 @@ docker logs traefik | grep -i certificate
 ## Monitoring
 
 ### Traefik Dashboard
-- **URL**: https://traefik.mjoln1r.com
+- **URL**: https://traefik.w0lverine.uk
 - **Username**: admin (from .env)
 - **Password**: Set during setup
 
