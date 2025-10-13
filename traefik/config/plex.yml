@@ -1,0 +1,17 @@
+http:
+  routers:
+    plex:
+      rule: Host(`plex.w0lverine.uk`)
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: cloudflare
+      service: plex-host
+      middlewares:
+        - security-headers@file
+  services:
+    plex-host:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: http://host.docker.internal:32400

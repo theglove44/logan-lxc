@@ -47,3 +47,4 @@ prometheus/data/
 Thumbs.db
 *.swp
 *.swo
+traefik/certs/

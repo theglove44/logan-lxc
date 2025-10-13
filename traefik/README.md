@@ -8,7 +8,7 @@ Traefik provides:
 - SSL/TLS termination with Let's Encrypt certificates
 - Automatic service discovery via Docker labels
 - Load balancing and health checks
-- Security middleware (rate limiting, headers, CORS)
+- Security middleware (rate limiting, headers)
 - Internal dashboard for monitoring
 
 ## Configuration Files
@@ -33,12 +33,14 @@ Traefik provides:
    CLOUDFLARE_API_KEY=your-cloudflare-api-token
    ```
 
+   Update `traefik/traefik.yml` and set `certificatesResolvers.cloudflare.acme.email` to the same address.
+
 3. **Generate Traefik Password**:
    ```bash
-   # Generate bcrypt hash for dashboard access
-   echo 'your-secure-password' | htpasswd -nbBC 10 admin | sed 's/$2y/$2a/'
+   # Generate an apr1 hash and escape $ for docker compose
+   echo 'your-secure-password' | htpasswd -nBm admin | sed 's/\$/\$\$/g'
    ```
-   Update `TRAEFIK_PASSWORD` in `.env` with the generated hash.
+   Replace the value of `traefik.http.middlewares.dashboard-auth.basicauth.users` in `traefik-compose.yml` with the generated hash.
 
 ### 2. DNS Configuration
 
@@ -83,7 +85,7 @@ docker compose -f traefik-compose.yml up -d
 docker logs traefik
 
 # Check Traefik health
-curl -f http://localhost:8080/api/overview
+curl -u admin:test -f http://localhost:8083/api/overview
 ```
 
 ### 4. SSL Certificate Generation
@@ -91,7 +93,7 @@ curl -f http://localhost:8080/api/overview
 Traefik will automatically generate SSL certificates on first request:
 ```bash
 # Trigger certificate generation
-curl -f https://jellyfin.w0lverine.uk
+curl -k --resolve jellyfin.w0lverine.uk:443:127.0.0.1 https://jellyfin.w0lverine.uk
 
 # Check certificate status
 docker logs traefik | grep -i certificate
@@ -124,27 +126,23 @@ docker logs traefik | grep -i certificate
 - X-Content-Type-Options: nosniff
 - Referrer-Policy: strict-origin-when-cross-origin
 
-### CORS
-- Configured for cross-origin requests
-- Allows credentials and specified headers
-
 ## Monitoring
 
 ### Traefik Dashboard
 - **URL**: https://traefik.w0lverine.uk
 - **Username**: admin (from .env)
-- **Password**: Set during setup
+- **Password**: Default placeholder is `test` (update by generating a new bcrypt/apr1 hash and replacing the value in `traefik-compose.yml`)
 
 ### Health Checks
 ```bash
 # Check Traefik health
-curl -f http://localhost:8080/ping
+curl -u admin:test -f http://localhost:8083/ping
 
 # View routing table
-curl -f http://localhost:8080/api/http/routers
+curl -u admin:test -f http://localhost:8083/api/http/routers
 
 # View services
-curl -f http://localhost:8080/api/http/services
+curl -u admin:test -f http://localhost:8083/api/http/services
 ```
 
 ## Troubleshooting
@@ -162,19 +160,19 @@ curl -f http://localhost:8080/api/http/services
    - Review Traefik routing rules
 
 3. **Dashboard Access Denied**:
-   - Verify TRAEFIK_PASSWORD hash format
-   - Check if credentials are set in .env
+   - Verify the basicauth hash configured in `traefik-compose.yml`
+   - Regenerate the hash and redeploy if you changed credentials
 
 ### Debug Commands
 ```bash
 # View all Traefik configuration
-curl -f http://localhost:8080/api/overview
+curl -u admin:test -f http://localhost:8083/api/overview
 
 # Check specific router
-curl -f http://localhost:8080/api/http/routers/jellyfin
+curl -u admin:test -f http://localhost:8083/api/http/routers/jellyfin
 
 # View middleware
-curl -f http://localhost:8080/api/http/middlewares
+curl -f http://localhost:8083/api/http/middlewares
 
 # Check Traefik logs with debug
 docker logs traefik --details

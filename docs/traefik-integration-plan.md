@@ -100,7 +100,7 @@ services:
     ports:
       - "80:80"    # HTTP
       - "443:443"  # HTTPS
-      - "8080:8080" # Dashboard (internal only)
+      - "8083:8080" # Dashboard (internal only)
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traefik/traefik.yml:/traefik.yml:ro
@@ -109,17 +109,20 @@ services:
     networks:
       - web
       - media_net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       - CLOUDFLARE_EMAIL=${CLOUDFLARE_EMAIL}
       - CLOUDFLARE_API_KEY=${CLOUDFLARE_API_KEY}
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.traefik.rule=Host(`traefik.w0lverine.uk`)"
+      - "traefik.http.routers.traefik.entrypoints=traefik"
+      - "traefik.http.routers.traefik.middlewares=dashboard-auth"
+      - "traefik.http.middlewares.dashboard-auth.basicauth.users=admin:$$apr1$$H6uskkkW$$IgXLP6ewTrSuBkTrqE8wj/"
       - "traefik.http.routers.traefik.service=api@internal"
-      - "traefik.http.routers.traefik.middlewares=auth"
-      - "traefik.http.middlewares.auth.basicauth.users=admin:$$2y$$05$$..."
     healthcheck:
-      test: ["CMD", "traefik", "healthcheck"]
+      test: ["CMD", "sh", "-c", "nc -z localhost 80"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -139,9 +142,25 @@ global:
   checkNewVersion: true
   sendAnonymousUsage: false
 
+log:
+  level: INFO
+accessLog: {}
+
+ping:
+  entryPoint: traefik
+
 api:
   dashboard: true
   insecure: false
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: web
+  file:
+    directory: /config
+    watch: true
 
 entryPoints:
   web:
@@ -162,7 +181,7 @@ entryPoints:
 certificatesResolvers:
   cloudflare:
     acme:
-      email: ${CLOUDFLARE_EMAIL}
+      email: you@example.com
       storage: /certs/acme.json
       dnsChallenge:
         provider: cloudflare
@@ -190,11 +209,9 @@ tls:
 # Cloudflare Integration
 CLOUDFLARE_EMAIL=your-email@example.com
 CLOUDFLARE_API_KEY=your-cloudflare-api-key
-
-# Traefik Credentials
-TRAEFIK_USERNAME=admin
-TRAEFIK_PASSWORD=secure-password-hash
 ```
+
+Update the `traefik.http.middlewares.dashboard-auth.basicauth.users` label in `traefik-compose.yml` with a hash you generate (the sample uses `admin:test` so replace it before production).
 
 ### Phase 2: Service Integration (60-90 minutes)
 
@@ -212,21 +229,41 @@ services:
       - "traefik.http.routers.jellyfin.tls.certresolver=cloudflare"
       - "traefik.http.routers.jellyfin.service=jellyfin"
       - "traefik.http.services.jellyfin.loadbalancer.server.port=8096"
-      - "traefik.http.routers.jellyfin.middlewares=security-headers,rate-limit"
+      - "traefik.http.routers.jellyfin.middlewares=security-headers@file,rate-limit@file"
 
   plex:
     # ... existing config ...
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.plex.rule=Host(`plex.w0lverine.uk`)"
-      - "traefik.http.routers.plex.entrypoints=websecure"
-      - "traefik.http.routers.plex.tls.certresolver=cloudflare"
-      - "traefik.http.routers.plex.service=plex"
-      - "traefik.http.services.plex.loadbalancer.server.port=32400"
-      - "traefik.http.routers.plex.middlewares=security-headers"
+    # Plex remains on host networking for LAN discovery (no Traefik labels here)
 
   # ... repeat for all services ...
 ```
+
+#### 2.1.1 Host-Network Service Bridge (Plex)
+Plex stays in `network_mode: host` to preserve LAN discovery and DLNA features. Instead of Docker labels, create a dynamic configuration file for Traefik:
+
+**File**: `traefik/config/plex.yml`
+
+```yaml
+http:
+  routers:
+    plex:
+      rule: Host(`plex.w0lverine.uk`)
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: cloudflare
+      service: plex-host
+      middlewares:
+        - security-headers@file
+  services:
+    plex-host:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: http://host.docker.internal:32400
+```
+
+> Note: `traefik-compose.yml` already maps `host.docker.internal` via `extra_hosts`, allowing the proxy to reach the host-network Plex instance.
 
 #### 2.2 Monitoring Services Labels
 **Update `homepage-stack.yml`** with similar labels for monitoring services.
@@ -256,26 +293,6 @@ http:
       rateLimit:
         burst: 100
         average: 50
-
-    auth:
-      basicAuth:
-        users:
-          - "admin:$2y$05$..."
-
-    cors:
-      cors:
-        allowCredentials: true
-        allowHeaders:
-          - "Content-Type"
-          - "Authorization"
-        allowMethods:
-          - "GET"
-          - "POST"
-          - "PUT"
-          - "DELETE"
-        allowOriginList:
-          - "https://w0lverine.uk"
-        maxAge: 86400
 ```
 
 ### Phase 4: DNS Configuration (15-20 minutes)
@@ -304,13 +321,13 @@ A    plex         YOUR_SERVER_IP    300
 
 #### 5.1 Internal Testing
 ```bash
-# Test Traefik health
-curl -f https://traefik.w0lverine.uk/api/overview
+# Test Traefik health (local dashboard API requires basic auth)
+curl -u admin:test -f http://localhost:8083/api/overview
 
-# Test service routing
-curl -f https://jellyfin.w0lverine.uk/web/index.html
-curl -f https://homepage.w0lverine.uk
-curl -f https://grafana.w0lverine.uk
+# Test service routing via local Traefik instance
+curl -k --resolve jellyfin.w0lverine.uk:443:127.0.0.1 https://jellyfin.w0lverine.uk/web/index.html
+curl -k --resolve homepage.w0lverine.uk:443:127.0.0.1 https://homepage.w0lverine.uk
+curl -k --resolve grafana.w0lverine.uk:443:127.0.0.1 https://grafana.w0lverine.uk
 ```
 
 #### 5.2 SSL Certificate Validation
