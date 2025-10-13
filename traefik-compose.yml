@@ -21,8 +21,8 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      - CLOUDFLARE_EMAIL=${CLOUDFLARE_EMAIL}
-      - CLOUDFLARE_API_KEY=${CLOUDFLARE_API_KEY}
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
+      - CLOUDFLARE_DNS_API_TOKEN=${CLOUDFLARE_DNS_API_TOKEN}
       - TRAEFIK_CERTIFICATESRESOLVERS_CLOUDFLARE_ACME_EMAIL=${TRAEFIK_CERTIFICATESRESOLVERS_CLOUDFLARE_ACME_EMAIL}
     labels:
       - "traefik.enable=true"

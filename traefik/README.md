@@ -30,7 +30,8 @@ Traefik provides:
    Edit `.env` file:
    ```bash
    CLOUDFLARE_EMAIL=your-email@example.com
-   CLOUDFLARE_API_KEY=your-cloudflare-api-token
+   CLOUDFLARE_API_TOKEN=cf-api-token-with-dns-edit
+   CLOUDFLARE_DNS_API_TOKEN=${CLOUDFLARE_API_TOKEN}
    ```
 
    Update `traefik/traefik.yml` and set `certificatesResolvers.cloudflare.acme.email` to the same address.
@@ -87,6 +88,11 @@ docker logs traefik
 # Check Traefik health
 curl -u admin:test -f http://localhost:8083/api/overview
 ```
+
+### 4. Open External Access
+
+- Forward TCP ports `80` and `443` from your router/firewall to the Traefik host (`10.0.0.100` in this setup).
+- Ensure the host firewall allows inbound `80/tcp` and `443/tcp` (e.g. `sudo ufw allow 80,443/tcp` if UFW is enabled).
 
 ### 4. SSL Certificate Generation
 

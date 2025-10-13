@@ -208,7 +208,8 @@ tls:
 ```bash
 # Cloudflare Integration
 CLOUDFLARE_EMAIL=your-email@example.com
-CLOUDFLARE_API_KEY=your-cloudflare-api-key
+CLOUDFLARE_API_TOKEN=cf-api-token-with-dns-edit
+CLOUDFLARE_DNS_API_TOKEN=${CLOUDFLARE_API_TOKEN}
 ```
 
 Update the `traefik.http.middlewares.dashboard-auth.basicauth.users` label in `traefik-compose.yml` with a hash you generate (the sample uses `admin:test` so replace it before production).
@@ -330,7 +331,12 @@ curl -k --resolve homepage.w0lverine.uk:443:127.0.0.1 https://homepage.w0lverine
 curl -k --resolve grafana.w0lverine.uk:443:127.0.0.1 https://grafana.w0lverine.uk
 ```
 
-#### 5.2 SSL Certificate Validation
+#### 5.2 Perimeter Access
+1. Forward TCP ports `80` and `443` on your router/firewall to the Traefik host.
+2. If host firewalling is enabled, allow the same ports (e.g. `sudo ufw allow 80,443/tcp`).
+3. From an external network (mobile data or online port checker) confirm `http://your-public-ip` and `https://your-public-ip` respond.
+
+#### 5.3 SSL Certificate Validation
 ```bash
 # Check certificate details
 echo | openssl s_client -servername jellyfin.w0lverine.uk -connect YOUR_SERVER_IP:443 2>/dev/null | openssl x509 -noout -dates -subject
@@ -339,7 +345,7 @@ echo | openssl s_client -servername jellyfin.w0lverine.uk -connect YOUR_SERVER_I
 curl https://www.ssllabs.com/ssltest/analyze.html?d=jellyfin.w0lverine.uk
 ```
 
-#### 5.3 External Access Testing
+#### 5.4 External Access Testing
 - Test from external network
 - Verify all services accessible via domain
 - Confirm SSL certificates valid
