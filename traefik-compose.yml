@@ -9,7 +9,6 @@ services:
     ports:
       - "80:80"    # HTTP
       - "443:443"  # HTTPS
-      - "8083:8080" # Dashboard (internal only)
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traefik/traefik.yml:/traefik.yml:ro
@@ -27,10 +26,12 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.traefik.rule=Host(`traefik.w0lverine.uk`)"
-      - "traefik.http.routers.traefik.entrypoints=traefik"
+      - "traefik.http.routers.traefik.entrypoints=websecure"
       - "traefik.http.routers.traefik.middlewares=dashboard-auth"
-      - "traefik.http.middlewares.dashboard-auth.basicauth.users=admin:$$apr1$$H6uskkkW$$IgXLP6ewTrSuBkTrqE8wj/"
+      - "traefik.http.middlewares.dashboard-auth.basicauth.users=admin:$$2y$$05$$OkF67TdpEXT89yAUjienweUVPVhWupgSWvlMjc5Ul/Irrdun3ilSi"
       - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.traefik.tls=true"
+      - "traefik.http.routers.traefik.tls.certresolver=cloudflare"
     healthcheck:
       test: ["CMD", "sh", "-c", "nc -z localhost 80"]
       interval: 30s
