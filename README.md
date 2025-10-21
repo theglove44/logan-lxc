@@ -246,3 +246,7 @@ ms logs radarr
 - Internal-only access: Homepage tiles use `HOMEPAGE_VAR_HOST_LAN`; links are LAN URLs.
 - Grafana admin defaults are for local use; change the password or disable anonymous viewer for stricter access.
 - Backups focus on app configuration and databases. Large media libraries are typically not backed up here (re-acquirable).
+
+## Repository maintenance
+- Run `git fsck --full` during regular audits to ensure the object database remains healthy.
+- Follow the history rewrite and branch hygiene process documented in [`docs/history-sanitization.md`](docs/history-sanitization.md) and [`docs/repo-maintenance.md`](docs/repo-maintenance.md) before publishing updates to a public remote.
