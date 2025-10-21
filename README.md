@@ -216,6 +216,13 @@ docker exec -it rclone_backup sh -lc 'rclone sync /data gdrive:mediaserver-borg 
 - Tracked: compose files, Homepage configs, Grafana provisioning, `backup/config/**`, `backup/rclone/crontab.txt`
 - Ignored: `.env`, appdata (service config dirs), `prometheus/data/`, Borg repo contents (`/mnt/backup`), `backup/rclone/rclone.conf` (rclone credentials)
 
+## Sanitizing leaked history
+- Run [`scripts/sanitize-history.sh`](scripts/sanitize-history.sh) to rewrite the
+  branch history and replace any committed LAN, Tailscale, or public IPs with
+  neutral placeholders. The playbook in
+  [`docs/history-sanitization.md`](docs/history-sanitization.md) covers the
+  replacement map, verification checks, and required force-push workflow.
+
 ## Maintenance cheatsheet
 ```
 # Update images now (in addition to Watchtower schedule)
