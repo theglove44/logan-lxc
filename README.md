@@ -116,6 +116,9 @@ Permissions
 - `.env` (not committed)
   - PUID, PGID, TZ, UMASK
   - HOST_LAN (LAN IP/hostname of the host)
+  - HOST_TAILSCALE (Tailscale hostname/IP to advertise, optional)
+  - PLEX_ADVERTISE_IPS (comma-separated Plex ADVERTISE_IP URLs)
+  - HOMEPAGE_ALLOWED_HOSTS (comma-separated allowlist for Homepage)
   - HOMEPAGE_VAR_HOST_LAN (same as HOST_LAN for dashboard links)
   - HOMEPAGE_VAR_SONARR_API_KEY, HOMEPAGE_VAR_RADARR_API_KEY, HOMEPAGE_VAR_SAB_API_KEY
   - HOMEPAGE_VAR_PLEX_TOKEN (auto-detected and saved)

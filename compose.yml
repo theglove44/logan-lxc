@@ -47,7 +47,7 @@ services:
       # Tip: set `PLEX_CLAIM=claim-xxxx` in `.env`, then restart just the plex service
       - PLEX_CLAIM=${PLEX_CLAIM:-}
       # Advertise direct LAN/Tailscale URLs so clients avoid relay/indirect
-      - ADVERTISE_IP=http://10.0.0.100:32400,http://100.76.120.49:32400
+      - ADVERTISE_IP=${PLEX_ADVERTISE_IPS:-http://localhost:32400}
     volumes:
       - /opt/mediaserver/plex/config:/config     # <-- change to your preferred config path
       - /mnt/storage/data/media:/media                # <-- root of your media library (or split by type)
