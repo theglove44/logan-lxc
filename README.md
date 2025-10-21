@@ -125,6 +125,10 @@ Permissions
   - HOMEPAGE_VAR_TAUTULLI_API_KEY (auto-detected by Tautulli)
   - HOMEPAGE_VAR_GRAFANA_USERNAME=admin, HOMEPAGE_VAR_GRAFANA_PASSWORD=admin (optional; anon viewer is enabled)
   - BORG_PASSPHRASE (encryption passphrase for Borg repository)
+- Fail2Ban jail overrides (`security/fail2ban/jail.d/`)
+  - Base jail lives in `plex.conf`
+  - Copy `plex.local.example` to `plex.local` and add only trusted management networks to `ignoreip`
+  - `*.local` overrides are ignored by Git so allowlists stay out of version control
 
 - Homepage config (`homepage/config/`)
   - `services.yaml` controls tiles and widgets; uses `{{HOMEPAGE_VAR_*}}` env vars
