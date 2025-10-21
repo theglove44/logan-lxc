@@ -21,12 +21,54 @@ http_status() {
   curl -s -o /dev/null -w "%{http_code}" "$1"
 }
 
+mask_key() {
+  local key="$1"
+
+  if [ -z "$key" ]; then
+    echo ""
+    return
+  fi
+
+  if [ "${SHOW_FULL_KEYS:-}" = "1" ]; then
+    echo "$key"
+    return
+  fi
+
+  local len=${#key}
+  if [ "$len" -le 8 ]; then
+    printf '%*s' "$len" '' | tr ' ' '*'
+    return
+  fi
+
+  local prefix=${key:0:4}
+  local suffix=${key: -4}
+  local masked_len=$((len - 8))
+
+  printf '%s' "$prefix"
+  printf '%*s' "$masked_len" '' | tr ' ' '*'
+  printf '%s' "$suffix"
+}
+
 echo "==> Reading API keys from config.xml…"
 SONARR_KEY="$(extract_key "$SONARR_CFG")"
 RADARR_KEY="$(extract_key "$RADARR_CFG")"
 
-[ -n "$SONARR_KEY" ] && echo "Sonarr API key:  ${SONARR_KEY}" || echo "Sonarr API key:  (NOT FOUND)"
-[ -n "$RADARR_KEY" ] && echo "Radarr API key:  ${RADARR_KEY}" || echo "Radarr API key:  (NOT FOUND)"
+if [ -n "$SONARR_KEY" ]; then
+  echo "Sonarr API key:  $(mask_key "$SONARR_KEY")"
+else
+  echo "Sonarr API key:  (NOT FOUND)"
+fi
+
+if [ -n "$RADARR_KEY" ]; then
+  echo "Radarr API key:  $(mask_key "$RADARR_KEY")"
+else
+  echo "Radarr API key:  (NOT FOUND)"
+fi
+
+if [ "${SHOW_FULL_KEYS:-}" != "1" ]; then
+  echo
+  echo "    (Set SHOW_FULL_KEYS=1 to print unredacted keys.)"
+fi
 
 echo
 echo "==> Testing API keys against running services…"
