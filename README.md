@@ -24,7 +24,7 @@ cd logan-lxc
 2) Configure env
 ```
 cp .env.example .env
-# edit .env to set PUID/PGID/TZ/UMASK, HOST_LAN, and API keys
+# edit .env to set PUID/PGID/TZ/UMASK, replace HOST_LAN's CHANGE_ME placeholder, optional ADVERTISE_IP/HOMEPAGE_ALLOWED_HOSTS, and API keys
 ```
 3) Bring up the main stack
 ```
@@ -115,8 +115,10 @@ Permissions
 ## Configuration
 - `.env` (not committed)
   - PUID, PGID, TZ, UMASK
-  - HOST_LAN (LAN IP/hostname of the host)
+  - HOST_LAN (LAN IP/hostname of the host; replace the `CHANGE_ME` placeholder with something like `192.168.1.50`)
   - HOMEPAGE_VAR_HOST_LAN (same as HOST_LAN for dashboard links)
+  - ADVERTISE_IP (optional Plex LAN/Tailscale URLs — comma-separated `scheme://host:port` entries, e.g. `http://192.168.1.50:32400`)
+  - HOMEPAGE_ALLOWED_HOSTS (Homepage allowed hosts — comma-separated host or host:port values, e.g. `localhost,127.0.0.1,media.example.com`)
   - HOMEPAGE_VAR_SONARR_API_KEY, HOMEPAGE_VAR_RADARR_API_KEY, HOMEPAGE_VAR_SAB_API_KEY
   - HOMEPAGE_VAR_PLEX_TOKEN (auto-detected and saved)
   - HOMEPAGE_VAR_TAUTULLI_API_KEY (auto-detected by Tautulli)
