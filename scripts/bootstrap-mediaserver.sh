@@ -1,223 +1,240 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ======= CONFIG (match compose.yml) =======
-# Public (host) URLs for readiness checks:
-SONARR_PUBLIC="http://127.0.0.1:8989"
-RADARR_PUBLIC="http://127.0.0.1:7878"
-PROWLARR_PUBLIC="http://127.0.0.1:9696"
+# Ensure we can resolve the directory even if invoked via symlink
+SOURCE=${BASH_SOURCE[0]}
+while [ -L "$SOURCE" ]; do
+  DIR=$(cd -P "$(dirname "$SOURCE")" && pwd)
+  SOURCE=$(readlink "$SOURCE")
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR=$(cd -P "$(dirname "$SOURCE")" && pwd)
 
-# Sonarr/Radarr -> SAB: use the host's LAN IP to avoid SAB host-whitelist 403
-HOST_LAN="10.0.0.100"
-SAB_HOST="$HOST_LAN"
-SAB_PORT=8080
+# shellcheck source=scripts/lib/bootstrap_common.sh
+source "$SCRIPT_DIR/lib/bootstrap_common.sh"
+bootstrap::set_curl_defaults 8 4
 
-# Internal URLs for Prowlarr apps (container-to-container is fine here):
-SONARR_INTERNAL="http://sonarr:8989"
-RADARR_INTERNAL="http://radarr:7878"
+# ======= CONFIG (matches compose.yml defaults; override via env if needed) =======
+SONARR_PUBLIC="${SONARR_PUBLIC:-http://127.0.0.1:8989}"
+RADARR_PUBLIC="${RADARR_PUBLIC:-http://127.0.0.1:7878}"
+SAB_PUBLIC="${SAB_PUBLIC:-http://127.0.0.1:8080}"
+PROWLARR_PUBLIC="${PROWLARR_PUBLIC:-http://127.0.0.1:9696}"
 
-# Container-internal root folders (per compose mounts):
-TV_ROOT="/tv"
-MOVIES_ROOT="/movies"
+SONARR_INTERNAL="${SONARR_INTERNAL:-http://sonarr:8989}"
+RADARR_INTERNAL="${RADARR_INTERNAL:-http://radarr:7878}"
+SAB_INTERNAL_HOST="${SAB_INTERNAL_HOST:-sabnzbd}"
+SAB_INTERNAL_PORT="${SAB_INTERNAL_PORT:-8080}"
 
-CURL_COMMON=(-sS --fail-with-body --max-time 12 --connect-timeout 4)
+TV_ROOT="${TV_ROOT:-/tv}"
+MOVIES_ROOT="${MOVIES_ROOT:-/movies}"
+SAB_COMPLETE="${SAB_COMPLETE:-/downloads}"
+SAB_INCOMPLETE="${SAB_INCOMPLETE:-/incomplete-downloads}"
+SAB_TV_CATEGORY="${SAB_TV_CATEGORY:-tv}"
+SAB_MOVIES_CATEGORY="${SAB_MOVIES_CATEGORY:-movies}"
 
-# ======= Helpers =======
-need_bin() { command -v "$1" >/dev/null 2>&1 || { echo "Missing dependency: $1"; exit 1; }; }
-
-wait_http() {
-  local url="$1" name="$2" max="${3:-90}"
-  echo "Waiting for $name at $url ..."
-  local code=""
-  for _ in $(seq 1 "$max"); do
-    code="$(curl -s -o /dev/null -w "%{http_code}" "$url" || true)"
-    if [ "$code" = "200" ] || [ "$code" = "301" ] || [ "$code" = "302" ] || [ "$code" = "401" ]; then
-      echo "OK: $name is up (HTTP $code)"
-      return 0
-    fi
-    sleep 2
-  done
-  echo "ERROR: $name not responding at $url (last HTTP code: $code)" >&2
-  exit 1
-}
-
-api_call() {
-  local method="$1" url="$2" header_json="${3:-}" body_json="${4:-}"
-  local args=("${CURL_COMMON[@]}" "-w" "\n__HTTP_CODE__:%{http_code}\n")
-  if [ -n "$header_json" ]; then
-    while IFS="=" read -r k v; do
-      [ -z "$k" ] && continue
-      args+=(-H "$k: ${v}")
-    done < <(jq -r 'to_entries[] | "\(.key)=\(.value)"' <<<"$header_json")
-  fi
-  case "$method" in
-    GET)  args+=("$url");;
-    POST) args+=(-X POST "$url" -H "Content-Type: application/json" --data-binary "$body_json");;
-    PUT)  args+=(-X PUT  "$url" -H "Content-Type: application/json" --data-binary "$body_json");;
-    *) echo "Unsupported method $method" >&2; exit 1;;
-  esac
-  local resp code
-  resp="$(curl "${args[@]}" || true)"
-  code="$(sed -n 's/^__HTTP_CODE__://p' <<<"$resp" | tail -n1)"
-  resp="$(sed '/^__HTTP_CODE__:/d' <<<"$resp")"
-  if [[ "$code" =~ ^2 ]]; then
-    printf "%s" "$resp"
-    return 0
-  fi
-  echo "HTTP $code from $method $url" >&2
-  [ -n "$resp" ] && echo "Response body:" >&2 && echo "$resp" >&2
-  return 1
-}
+SONARR_CLIENT_NAME="${SONARR_CLIENT_NAME:-sabnzbd}"
+RADARR_CLIENT_NAME="${RADARR_CLIENT_NAME:-sabnzbd}"
 
 # ======= Pre-flight =======
-need_bin curl; need_bin jq
-wait_http "${SONARR_PUBLIC}/" "Sonarr"
-wait_http "${RADARR_PUBLIC}/" "Radarr"
-wait_http "${PROWLARR_PUBLIC}/" "Prowlarr"
+bootstrap::need_bin curl
+bootstrap::need_bin jq
+bootstrap::wait_http "${SAB_PUBLIC}/api?mode=version" "SABnzbd"
+bootstrap::wait_http "${SONARR_PUBLIC}/" "Sonarr"
+bootstrap::wait_http "${RADARR_PUBLIC}/" "Radarr"
+bootstrap::wait_http "${PROWLARR_PUBLIC}/" "Prowlarr"
 
 echo
-echo "Enter API keys (from each UI Settings → General):"
-read -r -p "SABnzbd API key: " SAB_API_KEY
-read -r -p "Sonarr  API key: " SONARR_API_KEY
-read -r -p "Radarr  API key: " RADARR_API_KEY
-read -r -p "Prowlarr API key: " PROWLARR_API_KEY
+echo "Enter API keys (find them in each app's UI):"
+bootstrap::prompt_secret SAB_API_KEY      "SABnzbd API key"
+bootstrap::prompt_secret SONARR_API_KEY   "Sonarr API key"
+bootstrap::prompt_secret RADARR_API_KEY   "Radarr API key"
+bootstrap::prompt_secret PROWLARR_API_KEY "Prowlarr API key"
 
-HDR_SONARR="$(jq -nc --arg k "$SONARR_API_KEY" '{ "X-Api-Key": $k }')"
-HDR_RADARR="$(jq -nc --arg k "$RADARR_API_KEY" '{ "X-Api-Key": $k }')"
-HDR_PROWLARR="$(jq -nc --arg k "$PROWLARR_API_KEY" '{ "X-Api-Key": $k }')"
+HDR_SONARR="X-Api-Key: ${SONARR_API_KEY}"
+HDR_RADARR="X-Api-Key: ${RADARR_API_KEY}"
+HDR_PROWLARR="X-Api-Key: ${PROWLARR_API_KEY}"
 
-# ======= Sonarr: root folder & SAB client =======
+# ======= SABnzbd: folders & categories =======
+echo
+echo "Configuring SABnzbd folders and categories ..."
+bootstrap::curl_get_params "${SAB_PUBLIC}/api" \
+  --data-urlencode "apikey=${SAB_API_KEY}" \
+  --data-urlencode "mode=set_config" \
+  --data-urlencode "name=download_dir" \
+  --data-urlencode "value=${SAB_COMPLETE}" >/dev/null
+
+bootstrap::curl_get_params "${SAB_PUBLIC}/api" \
+  --data-urlencode "apikey=${SAB_API_KEY}" \
+  --data-urlencode "mode=set_config" \
+  --data-urlencode "name=complete_dir" \
+  --data-urlencode "value=${SAB_COMPLETE}" >/dev/null
+
+bootstrap::curl_get_params "${SAB_PUBLIC}/api" \
+  --data-urlencode "apikey=${SAB_API_KEY}" \
+  --data-urlencode "mode=set_config" \
+  --data-urlencode "name=script_dir" \
+  --data-urlencode "value=" >/dev/null
+
+bootstrap::curl_get_params "${SAB_PUBLIC}/api" \
+  --data-urlencode "apikey=${SAB_API_KEY}" \
+  --data-urlencode "mode=set_config" \
+  --data-urlencode "name=dirscan_dir" \
+  --data-urlencode "value=${SAB_COMPLETE}" >/dev/null
+
+bootstrap::curl_get_params "${SAB_PUBLIC}/api" \
+  --data-urlencode "apikey=${SAB_API_KEY}" \
+  --data-urlencode "mode=set_config" \
+  --data-urlencode "name=incomplete_dir" \
+  --data-urlencode "value=${SAB_INCOMPLETE}" >/dev/null
+
+sab_add_cat() {
+  local name="$1" dir="$2"
+  bootstrap::curl_get_params "${SAB_PUBLIC}/api" \
+    --data-urlencode "apikey=${SAB_API_KEY}" \
+    --data-urlencode "mode=add_category" \
+    --data-urlencode "name=${name}" \
+    --data-urlencode "pp=Default" \
+    --data-urlencode "script=" \
+    --data-urlencode "dir=${dir}" \
+    --data-urlencode "priority=0" >/dev/null
+}
+sab_add_cat "${SAB_TV_CATEGORY}" "${SAB_COMPLETE}/${SAB_TV_CATEGORY}"
+sab_add_cat "${SAB_MOVIES_CATEGORY}" "${SAB_COMPLETE}/${SAB_MOVIES_CATEGORY}"
+echo "SABnzbd configured."
+
+# ======= Sonarr: root folder (/tv) & SAB client =======
 echo
 echo "Configuring Sonarr root folder and SAB download client ..."
-# Detect URL Base (if any)
 SONARR_BASE="$SONARR_PUBLIC"
-if sys="$(api_call GET "${SONARR_PUBLIC}/api/v3/system/status" "$HDR_SONARR" || true)"; then
-  base_url="$(jq -r '.urlBase // ""' <<<"$sys")"
-  if [ -n "$base_url" ] && [ "$base_url" != "/" ]; then
-    SONARR_BASE="${SONARR_PUBLIC%/}/${base_url#/}"
-    echo "Detected Sonarr URL Base: $base_url → using $SONARR_BASE"
+if sys_json=$(bootstrap::curl_get "$HDR_SONARR" "${SONARR_PUBLIC}/api/v3/system/status" 2>/dev/null); then
+  if base_url=$(jq -r '.urlBase // ""' <<<"$sys_json" 2>/dev/null); then
+    if [ -n "$base_url" ] && [ "$base_url" != "/" ]; then
+      SONARR_BASE="${SONARR_PUBLIC%/}/${base_url#/}"
+      echo "Detected Sonarr URL Base: $base_url → using $SONARR_BASE"
+    fi
   fi
 fi
 
-root_json="$(api_call GET "${SONARR_BASE}/api/v3/rootFolder" "$HDR_SONARR")"
-if ! jq -e --arg p1 "$TV_ROOT" --arg p2 "${TV_ROOT%/}/" '.[] | select(.path==$p1 or .path==$p2)' >/dev/null <<<"$root_json"; then
-  api_call POST "${SONARR_BASE}/api/v3/rootFolder" "$HDR_SONARR" \
-    "$(jq -nc --arg path "$TV_ROOT" '{path:$path, accessible:true}')" >/dev/null
+SONARR_ROOTS=$(bootstrap::curl_get "$HDR_SONARR" "${SONARR_BASE}/api/v3/rootFolder")
+if ! jq -e --arg p1 "$TV_ROOT" --arg p2 "${TV_ROOT%/}/" '.[] | select(.path==$p1 or .path==$p2)' >/dev/null <<<"$SONARR_ROOTS"; then
+  bootstrap::curl_post "$HDR_SONARR" "{\"path\":\"${TV_ROOT}\",\"accessible\":true}" "${SONARR_BASE}/api/v3/rootFolder" >/dev/null
 fi
 
-dl_clients="$(api_call GET "${SONARR_BASE}/api/v3/downloadclient" "$HDR_SONARR")"
-if ! jq -e '.[] | select(.implementation=="Sabnzbd")' >/dev/null <<<"$dl_clients"; then
-  # Use host LAN IP to avoid SAB host whitelist issues
-  payload="$(jq -nc \
-    --arg host "$SAB_HOST" \
-    --argjson port "$SAB_PORT" \
-    --arg sabkey "$SAB_API_KEY" \
-    '{
-       enable:true, name:"sabnzbd", protocol:"usenet",
-       implementation:"Sabnzbd", configContract:"SabnzbdSettings",
-       fields:[
-         {name:"host", value:$host},
-         {name:"port", value:$port},
-         {name:"apiKey", value:$sabkey},
-         {name:"username", value:""},
-         {name:"password", value:""},
-         {name:"tvCategory", value:"tv"},
-         {name:"useSsl", value:false},
-         {name:"urlBase", value:""},
-         {name:"removeCompletedDownloads", value:true},
-         {name:"recentTvPriority", value:0},
-         {name:"olderTvPriority", value:0}
-       ]
-     }')"
-  if ! api_call POST "${SONARR_BASE}/api/v3/downloadclient" "$HDR_SONARR" "$payload" >/dev/null; then
-    echo "Retrying Sonarr SAB client using 'category' key ..." >&2
-    payload="$(jq -nc \
-      --arg host "$SAB_HOST" \
-      --argjson port "$SAB_PORT" \
-      --arg sabkey "$SAB_API_KEY" \
-      '{
-         enable:true, name:"sabnzbd", protocol:"usenet",
-         implementation:"Sabnzbd", configContract:"SabnzbdSettings",
-         fields:[
-           {name:"host", value:$host},
-           {name:"port", value:$port},
-           {name:"apiKey", value:$sabkey},
-           {name:"username", value:""},
-           {name:"password", value:""},
-           {name:"category", value:"tv"},
-           {name:"useSsl", value:false},
-           {name:"urlBase", value:""},
-           {name:"removeCompletedDownloads", value:true}
-         ]
-       }')"
-    api_call POST "${SONARR_BASE}/api/v3/downloadclient" "$HDR_SONARR" "$payload" >/dev/null
-  fi
+SONARR_CLIENTS=$(bootstrap::curl_get "$HDR_SONARR" "${SONARR_BASE}/api/v3/downloadclient")
+if ! jq -e --arg name "$SONARR_CLIENT_NAME" '.[] | select(.name==$name)' >/dev/null <<<"$SONARR_CLIENTS"; then
+  bootstrap::curl_post "$HDR_SONARR" "$(cat <<JSON
+{
+  "enable": true,
+  "name": "${SONARR_CLIENT_NAME}",
+  "protocol": "usenet",
+  "implementation": "Sabnzbd",
+  "configContract": "SabnzbdSettings",
+  "fields": [
+    {"name":"host", "value":"${SAB_INTERNAL_HOST}"},
+    {"name":"port", "value":${SAB_INTERNAL_PORT}},
+    {"name":"apiKey", "value":"${SAB_API_KEY}"},
+    {"name":"username", "value":""},
+    {"name":"password", "value":""},
+    {"name":"tvCategory", "value":"${SAB_TV_CATEGORY}"},
+    {"name":"useSsl", "value":false},
+    {"name":"urlBase", "value":""},
+    {"name":"removeCompletedDownloads", "value":true},
+    {"name":"recentTvPriority", "value":0},
+    {"name":"olderTvPriority", "value":0}
+  ]
+}
+JSON
+)" "${SONARR_BASE}/api/v3/downloadclient" >/dev/null
 fi
 
-api_call PUT "${SONARR_BASE}/api/v3/config/downloadclient" "$HDR_SONARR" \
-  '{"completedDownloadHandling":{"enable":true,"redownloadFailed":true}}' >/dev/null
+bootstrap::curl_put "$HDR_SONARR" '{"completedDownloadHandling":{"enable":true,"redownloadFailed":true}}' \
+  "${SONARR_BASE}/api/v3/config/downloadclient" >/dev/null
 echo "Sonarr configured."
 
-# ======= Radarr: root folder & SAB client =======
+# ======= Radarr: root folder (/movies) & SAB client =======
 echo
 echo "Configuring Radarr root folder and SAB download client ..."
-root_json="$(api_call GET "${RADARR_PUBLIC}/api/v3/rootFolder" "$HDR_RADARR")"
-if ! jq -e --arg p1 "$MOVIES_ROOT" --arg p2 "${MOVIES_ROOT%/}/" '.[] | select(.path==$p1 or .path==$p2)' >/dev/null <<<"$root_json"; then
-  api_call POST "${RADARR_PUBLIC}/api/v3/rootFolder" "$HDR_RADARR" \
-    "$(jq -nc --arg path "$MOVIES_ROOT" '{path:$path, accessible:true}')" >/dev/null
+RADARR_ROOTS=$(bootstrap::curl_get "$HDR_RADARR" "${RADARR_PUBLIC}/api/v3/rootFolder")
+if ! jq -e --arg p1 "$MOVIES_ROOT" --arg p2 "${MOVIES_ROOT%/}/" '.[] | select(.path==$p1 or .path==$p2)' >/dev/null <<<"$RADARR_ROOTS"; then
+  bootstrap::curl_post "$HDR_RADARR" "{\"path\":\"${MOVIES_ROOT}\",\"accessible\":true}" "${RADARR_PUBLIC}/api/v3/rootFolder" >/dev/null
 fi
 
-dl_clients="$(api_call GET "${RADARR_PUBLIC}/api/v3/downloadclient" "$HDR_RADARR")"
-if ! jq -e '.[] | select(.implementation=="Sabnzbd")' >/dev/null <<<"$dl_clients"; then
-  payload="$(jq -nc \
-    --arg host "$SAB_HOST" \
-    --argjson port "$SAB_PORT" \
-    --arg sabkey "$SAB_API_KEY" \
-    '{
-       enable:true, name:"sabnzbd", protocol:"usenet",
-       implementation:"Sabnzbd", configContract:"SabnzbdSettings",
-       fields:[
-         {name:"host", value:$host},
-         {name:"port", value:$port},
-         {name:"apiKey", value:$sabkey},
-         {name:"username", value:""},
-         {name:"password", value:""},
-         {name:"category", value:"movies"},
-         {name:"useSsl", value:false},
-         {name:"urlBase", value:""},
-         {name:"removeCompletedDownloads", value:true}
-       ]
-     }')"
-  api_call POST "${RADARR_PUBLIC}/api/v3/downloadclient" "$HDR_RADARR" "$payload" >/dev/null
+RADARR_CLIENTS=$(bootstrap::curl_get "$HDR_RADARR" "${RADARR_PUBLIC}/api/v3/downloadclient")
+if ! jq -e --arg name "$RADARR_CLIENT_NAME" '.[] | select(.name==$name)' >/dev/null <<<"$RADARR_CLIENTS"; then
+  bootstrap::curl_post "$HDR_RADARR" "$(cat <<JSON
+{
+  "enable": true,
+  "name": "${RADARR_CLIENT_NAME}",
+  "protocol": "usenet",
+  "implementation": "Sabnzbd",
+  "configContract": "SabnzbdSettings",
+  "fields": [
+    {"name":"host", "value":"${SAB_INTERNAL_HOST}"},
+    {"name":"port", "value":${SAB_INTERNAL_PORT}},
+    {"name":"apiKey", "value":"${SAB_API_KEY}"},
+    {"name":"username", "value":""},
+    {"name":"password", "value":""},
+    {"name":"category", "value":"${SAB_MOVIES_CATEGORY}"},
+    {"name":"useSsl", "value":false},
+    {"name":"urlBase", "value":""},
+    {"name":"removeCompletedDownloads", "value":true}
+  ]
+}
+JSON
+)" "${RADARR_PUBLIC}/api/v3/downloadclient" >/dev/null
 fi
 
-api_call PUT "${RADARR_PUBLIC}/api/v3/config/downloadclient" "$HDR_RADARR" \
-  '{"completedDownloadHandling":{"enable":true,"redownloadFailed":true}}' >/dev/null
+bootstrap::curl_put "$HDR_RADARR" '{"completedDownloadHandling":{"enable":true,"redownloadFailed":true}}' \
+  "${RADARR_PUBLIC}/api/v3/config/downloadclient" >/dev/null
 echo "Radarr configured."
 
-# ======= Prowlarr: register Sonarr & Radarr (use INTERNAL URLs) =======
+# ======= Prowlarr: register Sonarr & Radarr (internal URLs) =======
 echo
 echo "Registering Sonarr/Radarr inside Prowlarr ..."
-apps="$(api_call GET "${PROWLARR_PUBLIC}/api/v1/applications" "$HDR_PROWLARR")"
-
-if ! jq -e '.[] | select(.name=="Sonarr")' >/dev/null <<<"$apps"; then
-  payload="$(jq -nc --arg base "$SONARR_INTERNAL" --arg key "$SONARR_API_KEY" '{
-    name:"Sonarr", implementation:"Sonarr", configContract:"SonarrSettings",
-    syncLevel:"fullSync",
-    fields:[ {name:"apiKey",value:$key}, {name:"baseUrl",value:$base}, {name:"shouldSyncCategories",value:true}, {name:"tags",value:[]} ]
-  }')"
-  api_call POST "${PROWLARR_PUBLIC}/api/v1/applications" "$HDR_PROWLARR" "$payload" >/dev/null
+APPS_JSON=$(bootstrap::curl_get "$HDR_PROWLARR" "${PROWLARR_PUBLIC}/api/v1/applications")
+if ! jq -e '.[] | select(.name=="Sonarr")' >/dev/null <<<"$APPS_JSON"; then
+  bootstrap::curl_post "$HDR_PROWLARR" "$(cat <<JSON
+{
+  "name": "Sonarr",
+  "implementation": "Sonarr",
+  "configContract": "SonarrSettings",
+  "syncLevel": "fullSync",
+  "fields": [
+    {"name":"apiKey","value":"${SONARR_API_KEY}"},
+    {"name":"baseUrl","value":"${SONARR_INTERNAL}"},
+    {"name":"shouldSyncCategories","value":true},
+    {"name":"tags","value":[]}
+  ]
+}
+JSON
+)" "${PROWLARR_PUBLIC}/api/v1/applications" >/dev/null
+  APPS_JSON=""
 fi
 
-if ! jq -e '.[] | select(.name=="Radarr")' >/dev/null <<<"$apps"; then
-  payload="$(jq -nc --arg base "$RADARR_INTERNAL" --arg key "$RADARR_API_KEY" '{
-    name:"Radarr", implementation:"Radarr", configContract:"RadarrSettings",
-    syncLevel:"fullSync",
-    fields:[ {name:"apiKey",value:$key}, {name:"baseUrl",value:$base}, {name:"shouldSyncCategories",value:true}, {name:"tags",value:[]} ]
-  }')"
-  api_call POST "${PROWLARR_PUBLIC}/api/v1/applications" "$HDR_PROWLARR" "$payload" >/dev/null
+if [ -z "$APPS_JSON" ]; then
+  APPS_JSON=$(bootstrap::curl_get "$HDR_PROWLARR" "${PROWLARR_PUBLIC}/api/v1/applications")
+fi
+if ! jq -e '.[] | select(.name=="Radarr")' >/dev/null <<<"$APPS_JSON"; then
+  bootstrap::curl_post "$HDR_PROWLARR" "$(cat <<JSON
+{
+  "name": "Radarr",
+  "implementation": "Radarr",
+  "configContract": "RadarrSettings",
+  "syncLevel": "fullSync",
+  "fields": [
+    {"name":"apiKey","value":"${RADARR_API_KEY}"},
+    {"name":"baseUrl","value":"${RADARR_INTERNAL}"},
+    {"name":"shouldSyncCategories","value":true},
+    {"name":"tags","value":[]}
+  ]
+}
+JSON
+)" "${PROWLARR_PUBLIC}/api/v1/applications" >/dev/null
 fi
 
 echo
-echo "All set! ✅  Sonarr/Radarr roots + SAB clients wired (using $SAB_HOST:$SAB_PORT), Prowlarr apps registered."
-echo "Now add your indexers in Prowlarr; they'll sync automatically."
+echo "All set! ✅  SAB categories, Sonarr/Radarr roots + SAB clients, and Prowlarr apps configured."
+echo "Next:"
+echo "  • Add your indexers in Prowlarr — they'll sync to Sonarr/Radarr."
+echo "  • In Bazarr UI, connect to Sonarr/Radarr via ${SONARR_INTERNAL} & ${RADARR_INTERNAL}."
+echo "  • In Jellyseerr UI, connect Jellyfin + Sonarr/Radarr."
