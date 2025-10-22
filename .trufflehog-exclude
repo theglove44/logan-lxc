@@ -1,0 +1,3 @@
+# Paths ignored by the maintenance trufflehog scan
+\.git/
+backup/rclone/

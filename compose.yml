@@ -47,7 +47,7 @@ services:
       # Tip: set `PLEX_CLAIM=claim-xxxx` in `.env`, then restart just the plex service
       - PLEX_CLAIM=${PLEX_CLAIM:-}
       # Advertise direct LAN/Tailscale URLs so clients avoid relay/indirect
-      - ADVERTISE_IP=http://10.0.0.100:32400,http://100.76.120.49:32400
+      - ADVERTISE_IP=${PLEX_ADVERTISE_IPS:-http://localhost:32400}
     volumes:
       - /opt/mediaserver/plex/config:/config     # <-- change to your preferred config path
       - /mnt/storage/data/media:/media                # <-- root of your media library (or split by type)
@@ -287,7 +287,7 @@ services:
     environment:
       - TZ=Europe/London
       - WATCHTOWER_NOTIFICATIONS=shoutrrr
-      - WATCHTOWER_NOTIFICATION_URL=discord://JEFJGh8jQNjrH6V8t6IsvE41olupuu2XPMPfp2t7uKvZ4LvbhTw5VcbRJcj2kRiSrgVp@1411600579880550460
+      - WATCHTOWER_NOTIFICATION_URL=${WATCHTOWER_NOTIFICATION_URL:?set in .env}
       - WATCHTOWER_NOTIFICATIONS_LEVEL=info        # startup + updates + warnings/errors
       - WATCHTOWER_NOTIFICATION_REPORT=true        # send a summary every run (even 0 updates)
       - WATCHTOWER_NOTIFICATION_TITLE_TAG=watchtower@${HOSTNAME}

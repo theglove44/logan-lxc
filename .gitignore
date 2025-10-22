@@ -32,6 +32,7 @@ tautulli/
 *.pid
 *.db*
 security/fail2ban/db/
+security/fail2ban/jail.d/*.local
 *.log
 **/logs/**
 **/log/**

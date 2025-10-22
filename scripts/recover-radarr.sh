@@ -1,9 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-OLD_HOST="10.0.0.179"
-OLD_PORT="2053"
-OLD_PATH="/home/christof21/mediaserver/appdata/radarr"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+ENV_FILE="${ENV_FILE:-${REPO_ROOT}/.env}"
+
+if [ -f "$ENV_FILE" ]; then
+  # shellcheck source=/dev/null
+  set -a
+  source "$ENV_FILE"
+  set +a
+fi
+
+RECOVERY_SOURCE_HOST="${RECOVERY_SOURCE_HOST:-${1:-}}"
+if [ -z "$RECOVERY_SOURCE_HOST" ]; then
+  echo "Set RECOVERY_SOURCE_HOST or pass the source host as the first argument." >&2
+  exit 1
+fi
+
+OLD_HOST="$RECOVERY_SOURCE_HOST"
+OLD_PORT="${RECOVERY_SOURCE_PORT:-2053}"
+OLD_PATH="${RECOVERY_SOURCE_PATH:-/home/christof21/mediaserver/appdata/radarr}"
 NEW_CFG="/opt/mediaserver/radarr"
 RESTORE_STAGE="/opt/mediaserver/radarr_restore"
 PUID="${PUID:-1000}"

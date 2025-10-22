@@ -1,6 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+ENV_FILE="${ENV_FILE:-${REPO_ROOT}/.env}"
+
+if [ -f "$ENV_FILE" ]; then
+  # shellcheck source=/dev/null
+  set -a
+  source "$ENV_FILE"
+  set +a
+fi
+
+: "${HOST_LAN:?Set HOST_LAN to the LAN IP or hostname of the Docker host (define it in .env or export it before running this script)}"
+
 # ======= CONFIG (match compose.yml) =======
 # Public (host) URLs for readiness checks:
 SONARR_PUBLIC="http://127.0.0.1:8989"
@@ -8,7 +21,6 @@ RADARR_PUBLIC="http://127.0.0.1:7878"
 PROWLARR_PUBLIC="http://127.0.0.1:9696"
 
 # Sonarr/Radarr -> SAB: use the host's LAN IP to avoid SAB host-whitelist 403
-HOST_LAN="10.0.0.100"
 SAB_HOST="$HOST_LAN"
 SAB_PORT=8080
 

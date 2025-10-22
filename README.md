@@ -116,12 +116,19 @@ Permissions
 - `.env` (not committed)
   - PUID, PGID, TZ, UMASK
   - HOST_LAN (LAN IP/hostname of the host)
+  - HOST_TAILSCALE (Tailscale hostname/IP to advertise, optional)
+  - PLEX_ADVERTISE_IPS (comma-separated Plex ADVERTISE_IP URLs)
+  - HOMEPAGE_ALLOWED_HOSTS (comma-separated allowlist for Homepage)
   - HOMEPAGE_VAR_HOST_LAN (same as HOST_LAN for dashboard links)
   - HOMEPAGE_VAR_SONARR_API_KEY, HOMEPAGE_VAR_RADARR_API_KEY, HOMEPAGE_VAR_SAB_API_KEY
   - HOMEPAGE_VAR_PLEX_TOKEN (auto-detected and saved)
   - HOMEPAGE_VAR_TAUTULLI_API_KEY (auto-detected by Tautulli)
   - HOMEPAGE_VAR_GRAFANA_USERNAME=admin, HOMEPAGE_VAR_GRAFANA_PASSWORD=admin (optional; anon viewer is enabled)
   - BORG_PASSPHRASE (encryption passphrase for Borg repository)
+- Fail2Ban jail overrides (`security/fail2ban/jail.d/`)
+  - Base jail lives in `plex.conf`
+  - Copy `plex.local.example` to `plex.local` and add only trusted management networks to `ignoreip`
+  - `*.local` overrides are ignored by Git so allowlists stay out of version control
 
 - Homepage config (`homepage/config/`)
   - `services.yaml` controls tiles and widgets; uses `{{HOMEPAGE_VAR_*}}` env vars
@@ -209,6 +216,13 @@ docker exec -it rclone_backup sh -lc 'rclone sync /data gdrive:mediaserver-borg 
 - Tracked: compose files, Homepage configs, Grafana provisioning, `backup/config/**`, `backup/rclone/crontab.txt`
 - Ignored: `.env`, appdata (service config dirs), `prometheus/data/`, Borg repo contents (`/mnt/backup`), `backup/rclone/rclone.conf` (rclone credentials)
 
+## Sanitizing leaked history
+- Run [`scripts/sanitize-history.sh`](scripts/sanitize-history.sh) to rewrite the
+  branch history and replace any committed LAN, Tailscale, or public IPs with
+  neutral placeholders. The playbook in
+  [`docs/history-sanitization.md`](docs/history-sanitization.md) covers the
+  replacement map, verification checks, and required force-push workflow.
+
 ## Maintenance cheatsheet
 ```
 # Update images now (in addition to Watchtower schedule)
@@ -232,3 +246,8 @@ ms logs radarr
 - Internal-only access: Homepage tiles use `HOMEPAGE_VAR_HOST_LAN`; links are LAN URLs.
 - Grafana admin defaults are for local use; change the password or disable anonymous viewer for stricter access.
 - Backups focus on app configuration and databases. Large media libraries are typically not backed up here (re-acquirable).
+
+## Repository maintenance
+- Run [`scripts/run-maintenance-checks.sh`](scripts/run-maintenance-checks.sh) to mirror the CI suite (`git fsck --full`, verified `trufflehog` scan, and Compose config validation) before pushing changes.
+- The "Repository Maintenance Checks" GitHub Actions workflow (see [`.github/workflows/repo-maintenance.yml`](.github/workflows/repo-maintenance.yml)) enforces the same guardrails on pushes to `main` and pull requests.
+- Follow the history rewrite and branch hygiene process documented in [`docs/history-sanitization.md`](docs/history-sanitization.md), [`docs/repo-maintenance.md`](docs/repo-maintenance.md), and [`CONTRIBUTING.md`](CONTRIBUTING.md) before publishing updates to a public remote.

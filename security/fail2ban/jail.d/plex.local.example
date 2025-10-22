@@ -1,0 +1,5 @@
+# Copy to plex.local (ignored by Git) and customise per deployment.
+# Add only networks you can secure (e.g., management VLAN, VPN ranges).
+# Replace 192.0.2.0/24 with your actual trusted subnet(s).
+[plex-media-server]
+ignoreip = 127.0.0.1/8 ::1 192.0.2.0/24
