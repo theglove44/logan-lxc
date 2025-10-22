@@ -1,6 +1,28 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# ======= Resolve repo root & env =======
+SOURCE=${BASH_SOURCE[0]}
+while [ -L "$SOURCE" ]; do
+  DIR=$(cd -P "$(dirname "$SOURCE")" && pwd)
+  SOURCE=$(readlink "$SOURCE")
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR=$(cd -P "$(dirname "$SOURCE")" && pwd)
+ROOT_DIR=$(cd -P "$SCRIPT_DIR/.." && pwd)
+
+ENV_FILE="$ROOT_DIR/.env"
+if [ -f "$ENV_FILE" ]; then
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+fi
+
+: "${HOST_LAN:?HOST_LAN must be set (edit .env)}"
+if [ "$HOST_LAN" = "CHANGE_ME" ]; then
+  echo "Please set HOST_LAN in .env to the LAN IP or hostname of this host." >&2
+  exit 1
+fi
+
 # ======= CONFIG (match compose.yml) =======
 # Public (host) URLs for readiness checks:
 SONARR_PUBLIC="http://127.0.0.1:8989"
@@ -8,7 +30,6 @@ RADARR_PUBLIC="http://127.0.0.1:7878"
 PROWLARR_PUBLIC="http://127.0.0.1:9696"
 
 # Sonarr/Radarr -> SAB: use the host's LAN IP to avoid SAB host-whitelist 403
-HOST_LAN="10.0.0.100"
 SAB_HOST="$HOST_LAN"
 SAB_PORT=8080
 

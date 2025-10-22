@@ -10,7 +10,7 @@ services:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
-      - HOMEPAGE_ALLOWED_HOSTS=100.76.120.49:3000,10.0.0.100:3000,localhost,127.0.0.1,10.0.0.100
+      - HOMEPAGE_ALLOWED_HOSTS=${HOMEPAGE_ALLOWED_HOSTS}
       - HOMEPAGE_LOG_LEVEL=debug
     volumes:
       - /opt/mediaserver/homepage/config:/app/config
