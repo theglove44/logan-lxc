@@ -29,7 +29,7 @@ After verifying the rewrite, push the cleaned branch to your remote and delete
 any backup refs the script may have produced:
 
 ```bash
-git push --force-with-lease origin work
+git push --force-with-lease origin main
 ```
 
 Repeat the push for any other published branches or tags that contained the

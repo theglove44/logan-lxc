@@ -248,5 +248,6 @@ ms logs radarr
 - Backups focus on app configuration and databases. Large media libraries are typically not backed up here (re-acquirable).
 
 ## Repository maintenance
-- Run `git fsck --full` during regular audits to ensure the object database remains healthy.
-- Follow the history rewrite and branch hygiene process documented in [`docs/history-sanitization.md`](docs/history-sanitization.md) and [`docs/repo-maintenance.md`](docs/repo-maintenance.md) before publishing updates to a public remote.
+- Run [`scripts/run-maintenance-checks.sh`](scripts/run-maintenance-checks.sh) to mirror the CI suite (`git fsck --full`, verified `trufflehog` scan, and Compose config validation) before pushing changes.
+- The "Repository Maintenance Checks" GitHub Actions workflow (see [`.github/workflows/repo-maintenance.yml`](.github/workflows/repo-maintenance.yml)) enforces the same guardrails on pushes to `main` and pull requests.
+- Follow the history rewrite and branch hygiene process documented in [`docs/history-sanitization.md`](docs/history-sanitization.md), [`docs/repo-maintenance.md`](docs/repo-maintenance.md), and [`CONTRIBUTING.md`](CONTRIBUTING.md) before publishing updates to a public remote.
