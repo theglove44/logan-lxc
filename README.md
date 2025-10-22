@@ -11,8 +11,8 @@ Ops: Watchtower (Discord notifications), borgmatic (local encrypted backups), rc
 ---
 
 ## Prerequisites
-- Docker + Docker Compose
-- Host directories from `compose.yml` exist (e.g. `/opt/mediaserver`, `/mnt/storage/data`, `/mnt/backup`)
+- Docker + Docker Compose (v2.20+ recommended for `include:` support)
+- Host directories from the compose files exist (e.g. `/opt/mediaserver`, `/mnt/storage/data`, `/mnt/backup`)
 - A `.env` file with your user IDs, timezone, and API keys (see below)
 
 ## Quick Start
@@ -34,6 +34,19 @@ docker compose up -d
 ```
 docker compose -f homepage-stack.yml up -d
 ```
+
+### Compose combinations
+
+The compose files under `docker/` are split into logical modules so you can tailor the deployment. The root `compose.yml` uses the Compose `include:` directive to load all modules (base defaults + core + automation + monitoring). To start specific slices, combine the fragments explicitly:
+
+| Scenario | Command |
+| --- | --- |
+| Core media apps only | `docker compose -f docker/base.yml -f docker/core.yml up -d` |
+| Core + automation (backups, watchtower) | `docker compose -f docker/base.yml -f docker/core.yml -f docker/automation.yml up -d` |
+| Core + monitoring/security | `docker compose -f docker/base.yml -f docker/core.yml -f docker/monitoring.yml up -d` |
+| Full stack (equivalent to `docker compose up -d`) | `docker compose -f docker/base.yml -f docker/core.yml -f docker/automation.yml -f docker/monitoring.yml up -d` |
+
+Compose merges the files in the order given, so always list `docker/base.yml` first to register shared anchors, labels, and volume helpers used by other modules.
 
 ## Mediaserver CLI (ms)
 To simplify day-to-day operations, use the `ms` helper script.
@@ -196,7 +209,11 @@ docker exec -it rclone_backup sh -lc 'rclone sync /data gdrive:mediaserver-borg 
 - Scope: All containers by default; to restrict by label, add `--label-enable` and label services with `com.centurylinklabs.watchtower.enable=true`
 
 ## Repository layout
-- `compose.yml` — Core services
+- `compose.yml` — Aggregates the media stack modules via Compose `include:`
+- `docker/base.yml` — Shared anchors, volumes, and network defaults
+- `docker/core.yml` — Core media applications
+- `docker/automation.yml` — Automation & maintenance jobs (recyclarr, watchtower, backups)
+- `docker/monitoring.yml` — Monitoring and security helpers (tautulli, fail2ban)
 - `homepage-stack.yml` — Homepage + monitoring add-ons
 - `homepage/config/**` — Dashboard config (tracked)
 - `grafana/**` — Provisioning and dashboards

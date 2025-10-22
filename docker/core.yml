@@ -1,0 +1,177 @@
+services:
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    user: *mediaserver-user
+    environment:
+      <<: *tz-only-env
+      JELLYFIN_PublishedServerUrl: ${HOST_LAN}
+    volumes:
+      - /opt/mediaserver/jellyfin/config:/config
+      - /opt/mediaserver/jellyfin/cache:/cache
+      - *media-library
+    ports:
+      - "8096:8096"
+    labels:
+      - *watchtower-enabled
+    devices:
+      - /dev/dri:/dev/dri
+    group_add: *intel-render-groups
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8096/health"]
+      <<: *default-http-health
+
+  plex:
+    image: plexinc/pms-docker:public
+    container_name: plex
+    network_mode: host
+    environment:
+      TZ: ${TZ}
+      PLEX_UID: ${PUID}
+      PLEX_GID: ${PGID}
+      UMASK: "002"
+      PLEX_CLAIM: ${PLEX_CLAIM:-}
+      ADVERTISE_IP: http://10.0.0.100:32400,http://100.76.120.49:32400
+    volumes:
+      - /opt/mediaserver/plex/config:/config
+      - *media-library
+      - /opt/mediaserver/plex/transcode:/transcode
+    devices:
+      - /dev/dri:/dev/dri
+    group_add: *intel-render-groups
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "bash", "-O", "extglob", "-c", "curl -fsS http://127.0.0.1:32400/identity || exit 1"]
+      <<: *extended-http-health
+      start_period: 40s
+
+  overseerr:
+    image: lscr.io/linuxserver/overseerr:latest
+    container_name: overseerr
+    environment:
+      <<: *mediaserver-env
+    volumes:
+      - /opt/mediaserver/overseerr:/config
+    ports:
+      - "5155:5055"
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - sonarr
+      - radarr
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5055/api/v1/status"]
+      <<: *extended-http-health
+      start_period: 30s
+
+  sabnzbd:
+    image: lscr.io/linuxserver/sabnzbd:latest
+    container_name: sabnzbd
+    environment:
+      <<: *mediaserver-env-umask
+    volumes:
+      - /opt/mediaserver/sabnzbd:/config
+      - *downloads-root
+    ports:
+      - "8080:8080"
+    labels:
+      - *watchtower-enabled
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api?mode=version"]
+      <<: *default-http-health
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    environment:
+      <<: *mediaserver-env
+    volumes:
+      - /opt/mediaserver/prowlarr:/config
+      - *downloads-root
+    ports:
+      - "9696:9696"
+    labels:
+      - *watchtower-enabled
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9696/"]
+      <<: *default-http-health
+
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    environment:
+      <<: *mediaserver-env-umask
+    volumes:
+      - /opt/mediaserver/sonarr:/config
+      - *downloads-root
+      - *media-library
+    ports:
+      - "8989:8989"
+    labels:
+      - *watchtower-enabled
+    restart: unless-stopped
+    depends_on:
+      - sabnzbd
+      - prowlarr
+    healthcheck:
+      test: ["CMD", "bash", "-O", "extglob", "-c", "curl -fsS 'http://localhost:8989/api/v3/system/status?apikey=${HOMEPAGE_VAR_SONARR_API_KEY}' >/dev/null"]
+      <<: *default-http-health
+
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    environment:
+      <<: *mediaserver-env-umask
+    volumes:
+      - /opt/mediaserver/radarr:/config
+      - *downloads-root
+      - *media-library
+    ports:
+      - "7878:7878"
+    labels:
+      - *watchtower-enabled
+    restart: unless-stopped
+    depends_on:
+      - sabnzbd
+      - prowlarr
+    healthcheck:
+      test: ["CMD", "bash", "-O", "extglob", "-c", "curl -fsS 'http://localhost:7878/api/v3/system/status?apikey=${HOMEPAGE_VAR_RADARR_API_KEY}' >/dev/null"]
+      <<: *default-http-health
+
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    environment:
+      <<: *mediaserver-env
+    volumes:
+      - /opt/mediaserver/bazarr:/config
+      - *media-library
+    ports:
+      - "6767:6767"
+    labels:
+      - *watchtower-enabled
+    restart: unless-stopped
+    depends_on:
+      - sonarr
+      - radarr
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6767/system/status"]
+      <<: *default-http-health
+
+  jellyseerr:
+    image: fallenbagel/jellyseerr:latest
+    container_name: jellyseerr
+    environment:
+      <<: *tz-only-env
+      LOG_LEVEL: info
+    volumes:
+      - /opt/mediaserver/jellyseerr:/app/config
+    ports:
+      - "5055:5055"
+    restart: unless-stopped
+    depends_on:
+      - jellyfin

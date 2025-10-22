@@ -1,0 +1,34 @@
+services:
+  tautulli:
+    image: lscr.io/linuxserver/tautulli:latest
+    container_name: tautulli
+    environment:
+      <<: *mediaserver-env
+    volumes:
+      - /opt/mediaserver/tautulli:/config
+    ports:
+      - "8181:8181"
+    labels:
+      - *watchtower-enabled
+    restart: unless-stopped
+    depends_on:
+      - plex
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8181/"]
+      <<: *default-http-health
+
+  fail2ban:
+    image: crazymax/fail2ban:latest
+    container_name: fail2ban
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      <<: *tz-only-env
+      F2B_LOG_TARGET: STDOUT
+      F2B_LOG_LEVEL: INFO
+    volumes:
+      - ./security/fail2ban:/data
+      - "/opt/mediaserver/plex/config/Library/Application Support/Plex Media Server/Logs/Plex Media Server.log:/var/log/plexms/plexms.log:ro"
+    restart: unless-stopped

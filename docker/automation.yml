@@ -1,0 +1,72 @@
+services:
+  recyclarr:
+    image: ghcr.io/recyclarr/recyclarr:latest
+    container_name: recyclarr
+    user: *mediaserver-user
+    environment:
+      <<: *tz-only-env
+    volumes:
+      - /opt/mediaserver/recyclarr:/config
+    command: ["sync"]
+    restart: "no"
+
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      TZ: Europe/London
+      WATCHTOWER_NOTIFICATIONS: shoutrrr
+      WATCHTOWER_NOTIFICATION_URL: discord://JEFJGh8jQNjrH6V8t6IsvE41olupuu2XPMPfp2t7uKvZ4LvbhTw5VcbRJcj2kRiSrgVp@1411600579880550460
+      WATCHTOWER_NOTIFICATIONS_LEVEL: info
+      WATCHTOWER_NOTIFICATION_REPORT: "true"
+      WATCHTOWER_NOTIFICATION_TITLE_TAG: watchtower@${HOSTNAME}
+      WATCHTOWER_NO_STARTUP_MESSAGE: "true"
+      WATCHTOWER_NOTIFICATION_TEMPLATE: >-
+        {{- if .Report -}}{{- with .Report -}}{{len .Scanned}} scanned, {{len .Updated}} updated, {{len .Failed}} failed{{- if .Updated}}{{println}}Updated: {{- range $$i, $$u := .Updated}}{{- if $$i}}, {{end -}}{{$$u.Name}}{{- end}}{{- end -}}{{- if .Failed}}{{println}}Failed: {{- range $$i, $$f := .Failed}}{{- if $$i}}, {{end -}}{{$$f.Name}}{{- end}}{{- end -}}{{- if .Skipped}}{{println}}Skipped: {{- range $$i, $$s := .Skipped}}{{- if $$i}}, {{end -}}{{$$s.Name}}{{- end}}{{- end -}}{{- end -}}{{- end -}}
+      WATCHTOWER_INCLUDE_RESTARTING: "true"
+      WATCHTOWER_INCLUDE_STOPPED: "true"
+    command: >
+      --cleanup
+      --rolling-restart
+      --stop-timeout 60s
+      --schedule "0 0 4 * * *"
+    restart: unless-stopped
+
+  backup:
+    image: ghcr.io/borgmatic-collective/borgmatic:1.8.12
+    container_name: mediaserver-backup
+    restart: unless-stopped
+    environment:
+      TZ: Europe/London
+      BORG_REPOSITORY: /mnt/backup/mediaserver
+      BORG_PASSPHRASE: "${BORG_PASSPHRASE:?set in .env}"
+    volumes:
+      - ./backup/config:/etc/borgmatic:ro
+      - ./backup/config/crontab.txt:/etc/crontabs/root:ro
+      - borg-cache:/root/.cache/borg
+      - borg-config:/root/.config/borg
+      - .:/backup/mediaserver:ro
+      - *backup-root
+    read_only: true
+    tmpfs:
+      - /tmp:rw,exec
+      - /run:rw,exec
+
+  rclone_backup:
+    image: alpine:3.20
+    container_name: rclone_backup
+    restart: unless-stopped
+    environment:
+      <<: *tz-only-env
+      RCLONE_CONFIG: /etc/rclone/rclone.conf
+    volumes:
+      - /mnt/backup/mediaserver:/data:ro
+      - /opt/mediaserver/backup/rclone:/config/rclone
+      - ./backup/rclone/crontab.txt:/etc/crontabs/root:ro
+    command: >
+      sh -c "apk add --no-cache rclone tzdata >/dev/null \
+      && mkdir -p /etc/rclone /root/.config/rclone \
+      && if [ -f /config/rclone/rclone.conf ]; then cp /config/rclone/rclone.conf /etc/rclone/rclone.conf && cp /config/rclone/rclone.conf /root/.config/rclone/rclone.conf; else echo 'rclone.conf missing; run rclone config'; fi \
+      && crond -f -d 8"
