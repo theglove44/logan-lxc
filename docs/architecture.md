@@ -114,7 +114,7 @@ flowchart LR
 - Repository: `BORG_REPOSITORY=/mnt/backup/mediaserver` (host path bind‑mounted).
 - Encryption: `BORG_PASSPHRASE` provided via `.env`; never commit secrets.
 - Off‑site sync: `backup/rclone/crontab.txt` schedules nightly `rclone sync /data → gdrive:mediaserver-borg` (after Borg finishes). Run `rclone config` to set credentials.
-- Restore strategy: verify `borg list`, `borg extract` in a test location; document documented RTO/RPO and test cadence.
+- Restore strategy: verify `borg list`, `borg extract` in a test location; define RTO/RPO and document your test cadence.
 
 ## Key Data Flows
 
