@@ -1,49 +1,37 @@
-# Never commit secrets or heavy appdata
-.env
-.vscode/
-backup/*
-# Track only backup/config/** and backup/rclone/crontab.txt; keep rest ignored
-!backup/config/
-!backup/config/**
-!backup/rclone/
-!backup/rclone/crontab.txt
-# Keep rclone credentials/private files out of Git
-backup/rclone/rclone.conf
-backup/config/rclone.conf
-
-# Appdata folders (volumes) — exclude from VCS
-bazarr/
-jellyfin/
-jellyseerr/
-overseerr/
-plex/
-prowlarr/
-radarr/
-sabnzbd/
-sonarr/
-
-# Recyclarr runtime
-recyclarr/logs/
-recyclarr/configs/config.yaml
-recyclarr/repositories/
-tautulli/
-
-# Common noise
-*.pid
-*.db*
-security/fail2ban/db/
-*.log
-**/logs/**
-**/log/**
-**/cache/**
-**/Backups/**
-transcode/
-
-# Prometheus runtime data
-prometheus/data/
-
-# OS/editor
+# OS
 .DS_Store
 Thumbs.db
-*.swp
-*.swo
+
+# Python/venv
+__pycache__/
+.pytest_cache/
+.venv/
+venv/
+
+# Node
+node_modules/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override.tf.json
+terraform.rc
+.terraform.lock.hcl
+
+# Ansible
+*.retry
+
+# Kubernetes
+*.kubeconfig
+
+# Env/Secrets
+.env
+.env.*
+secrets.*
+
+# Logs
+*.log
+
