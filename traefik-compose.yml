@@ -9,7 +9,7 @@ services:
     ports:
       - "80:80"    # HTTP
       - "443:443"  # HTTPS
-      - "8080:8080" # Dashboard (internal only)
+      - "8083:8080" # Dashboard (internal only)
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traefik/traefik.yml:/traefik.yml:ro
@@ -18,17 +18,21 @@ services:
     networks:
       - web
       - media_net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
-      - CLOUDFLARE_EMAIL=${CLOUDFLARE_EMAIL}
-      - CLOUDFLARE_API_KEY=${CLOUDFLARE_API_KEY}
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
+      - CLOUDFLARE_DNS_API_TOKEN=${CLOUDFLARE_DNS_API_TOKEN}
+      - TRAEFIK_CERTIFICATESRESOLVERS_CLOUDFLARE_ACME_EMAIL=${TRAEFIK_CERTIFICATESRESOLVERS_CLOUDFLARE_ACME_EMAIL}
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.traefik.rule=Host(`traefik.mjoln1r.com`)"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.w0lverine.uk`)"
+      - "traefik.http.routers.traefik.entrypoints=traefik"
+      - "traefik.http.routers.traefik.middlewares=dashboard-auth"
+      - "traefik.http.middlewares.dashboard-auth.basicauth.users=admin:$$apr1$$H6uskkkW$$IgXLP6ewTrSuBkTrqE8wj/"
       - "traefik.http.routers.traefik.service=api@internal"
-      - "traefik.http.routers.traefik.middlewares=auth"
-      - "traefik.http.middlewares.auth.basicauth.users=admin:$$2y$$05$$..."
     healthcheck:
-      test: ["CMD", "traefik", "healthcheck"]
+      test: ["CMD", "sh", "-c", "nc -z localhost 80"]
       interval: 30s
       timeout: 10s
       retries: 3

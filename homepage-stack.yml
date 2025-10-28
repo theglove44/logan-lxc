@@ -18,6 +18,18 @@ services:
     env_file: .env
     ports:
       - "3000:3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.homepage.rule=Host(`homepage.w0lverine.uk`)"
+      - "traefik.http.routers.homepage.entrypoints=websecure"
+      - "traefik.http.routers.homepage.tls.certresolver=cloudflare"
+      - "traefik.http.routers.homepage.service=homepage"
+      - "traefik.http.services.homepage.loadbalancer.server.port=3000"
+      - "traefik.http.routers.homepage.middlewares=security-headers@file"
+      - "traefik.docker.network=web"
+    networks:
+      - default
+      - web
 
   dozzle:
     image: amir20/dozzle:latest
@@ -27,6 +39,18 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     ports:
       - "9999:8080"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dozzle.rule=Host(`dozzle.w0lverine.uk`)"
+      - "traefik.http.routers.dozzle.entrypoints=websecure"
+      - "traefik.http.routers.dozzle.tls.certresolver=cloudflare"
+      - "traefik.http.routers.dozzle.service=dozzle"
+      - "traefik.http.services.dozzle.loadbalancer.server.port=8080"
+      - "traefik.http.routers.dozzle.middlewares=security-headers@file"
+      - "traefik.docker.network=web"
+    networks:
+      - default
+      - web
 
   filebrowser:
     image: filebrowser/filebrowser:latest
@@ -41,6 +65,18 @@ services:
       - /opt/mediaserver/filebrowser/settings.json:/config/settings.json
     ports:
       - "8081:80"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.filebrowser.rule=Host(`filebrowser.w0lverine.uk`)"
+      - "traefik.http.routers.filebrowser.entrypoints=websecure"
+      - "traefik.http.routers.filebrowser.tls.certresolver=cloudflare"
+      - "traefik.http.routers.filebrowser.service=filebrowser"
+      - "traefik.http.services.filebrowser.loadbalancer.server.port=80"
+      - "traefik.http.routers.filebrowser.middlewares=security-headers@file"
+      - "traefik.docker.network=web"
+    networks:
+      - default
+      - web
 
   # --- METRICS CORE ---
   prometheus:
@@ -57,6 +93,18 @@ services:
       - "host.docker.internal:host-gateway"
     ports:
       - "9090:9090"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.w0lverine.uk`)"
+      - "traefik.http.routers.prometheus.entrypoints=websecure"
+      - "traefik.http.routers.prometheus.tls.certresolver=cloudflare"
+      - "traefik.http.routers.prometheus.service=prometheus"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+      - "traefik.http.routers.prometheus.middlewares=security-headers@file"
+      - "traefik.docker.network=web"
+    networks:
+      - default
+      - web
 
   blackbox_exporter:
     image: prom/blackbox-exporter:latest
@@ -82,6 +130,18 @@ services:
       - /opt/mediaserver/grafana/dashboards:/var/lib/grafana/dashboards
     ports:
       - "3001:3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.w0lverine.uk`)"
+      - "traefik.http.routers.grafana.entrypoints=websecure"
+      - "traefik.http.routers.grafana.tls.certresolver=cloudflare"
+      - "traefik.http.routers.grafana.service=grafana"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+      - "traefik.http.routers.grafana.middlewares=security-headers@file"
+      - "traefik.docker.network=web"
+    networks:
+      - default
+      - web
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
@@ -134,3 +194,6 @@ networks:
     name: media_net
     external: true
     # Keeps LAN/Tailscale exposure simple via host IP bindings above
+
+  web:
+    external: true

@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This document outlines the comprehensive plan to integrate Traefik reverse proxy into the existing mediaserver Docker Compose stack. The integration will provide centralized SSL/TLS termination, domain-based routing, and enhanced security for external access using the domain `mjoln1r.com`.
+This document outlines the comprehensive plan to integrate Traefik reverse proxy into the existing mediaserver Docker Compose stack. The integration will provide centralized SSL/TLS termination, domain-based routing, and enhanced security for external access using the domain `w0lverine.uk`.
 
 **Project**: Logan LXC Mediaserver  
 **Goal**: Enable secure external access to media services via domain names  
@@ -42,27 +42,27 @@ This document outlines the comprehensive plan to integrate Traefik reverse proxy
 
 ### Domain Structure
 ```
-mjoln1r.com (main domain)
-├── jellyfin.mjoln1r.com → Jellyfin media server
-├── plex.mjoln1r.com → Plex media server
-├── overseerr.mjoln1r.com → Content request portal
-├── sonarr.mjoln1r.com → TV automation
-├── radarr.mjoln1r.com → Movie automation
-├── prowlarr.mjoln1r.com → Indexer management
-├── sabnzbd.mjoln1r.com → Download client
-├── bazarr.mjoln1r.com → Subtitle management
-├── tautulli.mjoln1r.com → Plex analytics
-├── homepage.mjoln1r.com → Main dashboard
-├── grafana.mjoln1r.com → Monitoring dashboard
-├── prometheus.mjoln1r.com → Metrics database
-├── dozzle.mjoln1r.com → Container logs
-└── filebrowser.mjoln1r.com → File manager
+w0lverine.uk (main domain)
+├── jellyfin.w0lverine.uk → Jellyfin media server
+├── plex.w0lverine.uk → Plex media server
+├── overseerr.w0lverine.uk → Content request portal
+├── sonarr.w0lverine.uk → TV automation
+├── radarr.w0lverine.uk → Movie automation
+├── prowlarr.w0lverine.uk → Indexer management
+├── sabnzbd.w0lverine.uk → Download client
+├── bazarr.w0lverine.uk → Subtitle management
+├── tautulli.w0lverine.uk → Plex analytics
+├── homepage.w0lverine.uk → Main dashboard
+├── grafana.w0lverine.uk → Monitoring dashboard
+├── prometheus.w0lverine.uk → Metrics database
+├── dozzle.w0lverine.uk → Container logs
+└── filebrowser.w0lverine.uk → File manager
 ```
 
 ### SSL/TLS Configuration
 - **Certificate Provider**: Let's Encrypt
 - **DNS Challenge**: Cloudflare DNS-01
-- **Certificate Type**: Wildcard `*.mjoln1r.com`
+- **Certificate Type**: Wildcard `*.w0lverine.uk`
 - **Auto-renewal**: Enabled (60 days)
 - **Security**: TLS 1.2/1.3 with secure ciphers
 
@@ -100,7 +100,7 @@ services:
     ports:
       - "80:80"    # HTTP
       - "443:443"  # HTTPS
-      - "8080:8080" # Dashboard (internal only)
+      - "8083:8080" # Dashboard (internal only)
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traefik/traefik.yml:/traefik.yml:ro
@@ -109,17 +109,20 @@ services:
     networks:
       - web
       - media_net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       - CLOUDFLARE_EMAIL=${CLOUDFLARE_EMAIL}
       - CLOUDFLARE_API_KEY=${CLOUDFLARE_API_KEY}
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.traefik.rule=Host(`traefik.mjoln1r.com`)"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.w0lverine.uk`)"
+      - "traefik.http.routers.traefik.entrypoints=traefik"
+      - "traefik.http.routers.traefik.middlewares=dashboard-auth"
+      - "traefik.http.middlewares.dashboard-auth.basicauth.users=admin:$$apr1$$H6uskkkW$$IgXLP6ewTrSuBkTrqE8wj/"
       - "traefik.http.routers.traefik.service=api@internal"
-      - "traefik.http.routers.traefik.middlewares=auth"
-      - "traefik.http.middlewares.auth.basicauth.users=admin:$$2y$$05$$..."
     healthcheck:
-      test: ["CMD", "traefik", "healthcheck"]
+      test: ["CMD", "sh", "-c", "nc -z localhost 80"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -139,9 +142,25 @@ global:
   checkNewVersion: true
   sendAnonymousUsage: false
 
+log:
+  level: INFO
+accessLog: {}
+
+ping:
+  entryPoint: traefik
+
 api:
   dashboard: true
   insecure: false
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: web
+  file:
+    directory: /config
+    watch: true
 
 entryPoints:
   web:
@@ -162,7 +181,7 @@ entryPoints:
 certificatesResolvers:
   cloudflare:
     acme:
-      email: ${CLOUDFLARE_EMAIL}
+      email: you@example.com
       storage: /certs/acme.json
       dnsChallenge:
         provider: cloudflare
@@ -189,12 +208,11 @@ tls:
 ```bash
 # Cloudflare Integration
 CLOUDFLARE_EMAIL=your-email@example.com
-CLOUDFLARE_API_KEY=your-cloudflare-api-key
-
-# Traefik Credentials
-TRAEFIK_USERNAME=admin
-TRAEFIK_PASSWORD=secure-password-hash
+CLOUDFLARE_API_TOKEN=cf-api-token-with-dns-edit
+CLOUDFLARE_DNS_API_TOKEN=${CLOUDFLARE_API_TOKEN}
 ```
+
+Update the `traefik.http.middlewares.dashboard-auth.basicauth.users` label in `traefik-compose.yml` with a hash you generate (the sample uses `admin:test` so replace it before production).
 
 ### Phase 2: Service Integration (60-90 minutes)
 
@@ -207,26 +225,46 @@ services:
     # ... existing config ...
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.jellyfin.rule=Host(`jellyfin.mjoln1r.com`)"
+      - "traefik.http.routers.jellyfin.rule=Host(`jellyfin.w0lverine.uk`)"
       - "traefik.http.routers.jellyfin.entrypoints=websecure"
       - "traefik.http.routers.jellyfin.tls.certresolver=cloudflare"
       - "traefik.http.routers.jellyfin.service=jellyfin"
       - "traefik.http.services.jellyfin.loadbalancer.server.port=8096"
-      - "traefik.http.routers.jellyfin.middlewares=security-headers,rate-limit"
+      - "traefik.http.routers.jellyfin.middlewares=security-headers@file,rate-limit@file"
 
   plex:
     # ... existing config ...
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.plex.rule=Host(`plex.mjoln1r.com`)"
-      - "traefik.http.routers.plex.entrypoints=websecure"
-      - "traefik.http.routers.plex.tls.certresolver=cloudflare"
-      - "traefik.http.routers.plex.service=plex"
-      - "traefik.http.services.plex.loadbalancer.server.port=32400"
-      - "traefik.http.routers.plex.middlewares=security-headers"
+    # Plex remains on host networking for LAN discovery (no Traefik labels here)
 
   # ... repeat for all services ...
 ```
+
+#### 2.1.1 Host-Network Service Bridge (Plex)
+Plex stays in `network_mode: host` to preserve LAN discovery and DLNA features. Instead of Docker labels, create a dynamic configuration file for Traefik:
+
+**File**: `traefik/config/plex.yml`
+
+```yaml
+http:
+  routers:
+    plex:
+      rule: Host(`plex.w0lverine.uk`)
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: cloudflare
+      service: plex-host
+      middlewares:
+        - security-headers@file
+  services:
+    plex-host:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: http://host.docker.internal:32400
+```
+
+> Note: `traefik-compose.yml` already maps `host.docker.internal` via `extra_hosts`, allowing the proxy to reach the host-network Plex instance.
 
 #### 2.2 Monitoring Services Labels
 **Update `homepage-stack.yml`** with similar labels for monitoring services.
@@ -256,26 +294,6 @@ http:
       rateLimit:
         burst: 100
         average: 50
-
-    auth:
-      basicAuth:
-        users:
-          - "admin:$2y$05$..."
-
-    cors:
-      cors:
-        allowCredentials: true
-        allowHeaders:
-          - "Content-Type"
-          - "Authorization"
-        allowMethods:
-          - "GET"
-          - "POST"
-          - "PUT"
-          - "DELETE"
-        allowOriginList:
-          - "https://mjoln1r.com"
-        maxAge: 86400
 ```
 
 ### Phase 4: DNS Configuration (15-20 minutes)
@@ -286,7 +304,7 @@ http:
 | Type | Name | Value | TTL | Purpose |
 |------|------|-------|-----|---------|
 | A | @ | YOUR_SERVER_IP | 300 | Main domain → server IP |
-| CNAME | * | mjoln1r.com | 300 | **Wildcard** → handles ALL subdomains |
+| CNAME | * | w0lverine.uk | 300 | **Wildcard** → handles ALL subdomains |
 
 **✅ Perfect Setup!**
 - The wildcard CNAME (`*`) automatically routes all subdomains to your main domain
@@ -304,25 +322,30 @@ A    plex         YOUR_SERVER_IP    300
 
 #### 5.1 Internal Testing
 ```bash
-# Test Traefik health
-curl -f https://traefik.mjoln1r.com/api/overview
+# Test Traefik health (local dashboard API requires basic auth)
+curl -u admin:test -f http://localhost:8083/api/overview
 
-# Test service routing
-curl -f https://jellyfin.mjoln1r.com/web/index.html
-curl -f https://homepage.mjoln1r.com
-curl -f https://grafana.mjoln1r.com
+# Test service routing via local Traefik instance
+curl -k --resolve jellyfin.w0lverine.uk:443:127.0.0.1 https://jellyfin.w0lverine.uk/web/index.html
+curl -k --resolve homepage.w0lverine.uk:443:127.0.0.1 https://homepage.w0lverine.uk
+curl -k --resolve grafana.w0lverine.uk:443:127.0.0.1 https://grafana.w0lverine.uk
 ```
 
-#### 5.2 SSL Certificate Validation
+#### 5.2 Perimeter Access
+1. Forward TCP ports `80` and `443` on your router/firewall to the Traefik host.
+2. If host firewalling is enabled, allow the same ports (e.g. `sudo ufw allow 80,443/tcp`).
+3. From an external network (mobile data or online port checker) confirm `http://your-public-ip` and `https://your-public-ip` respond.
+
+#### 5.3 SSL Certificate Validation
 ```bash
 # Check certificate details
-echo | openssl s_client -servername jellyfin.mjoln1r.com -connect YOUR_SERVER_IP:443 2>/dev/null | openssl x509 -noout -dates -subject
+echo | openssl s_client -servername jellyfin.w0lverine.uk -connect YOUR_SERVER_IP:443 2>/dev/null | openssl x509 -noout -dates -subject
 
 # Test SSL Labs rating
-curl https://www.ssllabs.com/ssltest/analyze.html?d=jellyfin.mjoln1r.com
+curl https://www.ssllabs.com/ssltest/analyze.html?d=jellyfin.w0lverine.uk
 ```
 
-#### 5.3 External Access Testing
+#### 5.4 External Access Testing
 - Test from external network
 - Verify all services accessible via domain
 - Confirm SSL certificates valid
@@ -368,7 +391,7 @@ docker compose -f traefik-compose.yml exec traefik sh -c "
 echo 'http:
   routers:
     jellyfin:
-      rule: Host(\`jellyfin.mjoln1r.com\`)
+      rule: Host(\`jellyfin.w0lverine.uk\`)
       entrypoints: [websecure]
       tls: {}
       service: jellyfin

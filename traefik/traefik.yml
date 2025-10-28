@@ -2,6 +2,13 @@ global:
   checkNewVersion: true
   sendAnonymousUsage: false
 
+log:
+  level: INFO
+accessLog: {}
+
+ping:
+  entryPoint: traefik
+
 api:
   dashboard: true
   insecure: false
@@ -22,10 +29,18 @@ entryPoints:
   traefik:
     address: ":8080"
 
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: web
+  file:
+    directory: /config
+    watch: true
+
 certificatesResolvers:
   cloudflare:
     acme:
-      email: ${CLOUDFLARE_EMAIL}
       storage: /certs/acme.json
       dnsChallenge:
         provider: cloudflare
