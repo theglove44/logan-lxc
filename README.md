@@ -52,8 +52,8 @@ Prerequisites: Docker Engine 24+, Docker Compose v2, and access to your containe
 4. Bring up the stack for your environment:
    - Example: `docker compose up -d` (adjust to your compose files)
 5. Access observability:
-   - Prometheus: http://localhost:9090
-   - Grafana: http://localhost:3000 (default creds: `admin` / set via env or secret)
+   - Prometheus: [http://localhost:9090](http://localhost:9090)
+   - Grafana: [http://localhost:3000](http://localhost:3000) (default creds: `admin` / set via env or secret)
 
 ## Configuration
 
