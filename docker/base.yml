@@ -1,0 +1,47 @@
+name: mediaserver
+
+x-users:
+  mediaserver: &mediaserver-user "${PUID}:${PGID}"
+
+x-labels:
+  watchtower: &watchtower-enabled "com.centurylinklabs.watchtower.enable=true"
+
+x-env:
+  mediaserver: &mediaserver-env
+    PUID: ${PUID}
+    PGID: ${PGID}
+    TZ: ${TZ}
+  mediaserver_with_umask: &mediaserver-env-umask
+    <<: *mediaserver-env
+    UMASK: ${UMASK}
+  tz_only: &tz-only-env
+    TZ: ${TZ}
+
+x-groups:
+  intel_render: &intel-render-groups
+    - "993"
+    - "44"
+
+x-healthchecks:
+  default_http: &default-http-health
+    interval: 30s
+    timeout: 5s
+    retries: 10
+  extended_http: &extended-http-health
+    interval: 30s
+    timeout: 10s
+    retries: 10
+
+x-volumes:
+  media_library: &media-library "/mnt/storage/data/media:/media"
+  downloads_root: &downloads-root "/mnt/storage/data:/data"
+  backup_root: &backup-root "/mnt/backup:/mnt/backup"
+
+volumes:
+  borg-cache:
+  borg-config:
+
+networks:
+  default:
+    name: media_net
+    driver: bridge
