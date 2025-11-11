@@ -1,0 +1,10 @@
+# Example Kubernetes/Helm values for production
+replicaCount: 3
+resources:
+  requests:
+    cpu: 300m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+

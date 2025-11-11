@@ -1,14 +1,19 @@
-# Logan LXC Mediaserver
+# Docker Infrastructure Stack
 
-Reproducible Docker Compose stack for a personal media server with an internal dashboard, monitoring, automated updates, and backups (local + Google Drive offsite).
+[![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?logo=prometheus&logoColor=white)](https://prometheus.io/)
+[![Grafana](https://img.shields.io/badge/Grafana-F46800?logo=grafana&logoColor=white)](https://grafana.com/)
 
-Core apps: Jellyfin, Plex, Sonarr, Radarr, SABnzbd, Prowlarr, Overseerr, Bazarr, Tautulli, Filebrowser, Dozzle
+Production‑ready container infrastructure with built‑in observability. This stack standardizes how services are packaged, configured, deployed, and monitored using Docker, Prometheus, and Grafana.
 
-Observability: Prometheus, node-exporter, cAdvisor, Grafana (provisioned dashboards), Homepage dashboard
+## Business Value
 
-Ops: Watchtower (Discord notifications), borgmatic (local encrypted backups), rclone (Google Drive sync)
+- Faster delivery: consistent, repeatable deployments using containers and declarative configs
+- Lower risk: observability by default (metrics, dashboards, alerts) reduces blind spots
+- Operational efficiency: shared tooling and patterns across environments (dev/staging/prod)
+- Cost visibility: usage metrics and capacity dashboards inform rightsizing decisions
 
----
+## Quantifiable Results (targets/examples)
 
 ## Prerequisites
 - Docker + Docker Compose (v2.20+ recommended for `include:` support)
