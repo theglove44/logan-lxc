@@ -39,6 +39,11 @@ docker compose up -d
 ```
 docker compose -f homepage-stack.yml up -d
 ```
+5) Bootstrap Sonarr/Radarr/SABnzbd/Prowlarr wiring
+```
+./scripts/bootstrap-mediaserver.sh
+```
+This script waits for the apps to become reachable, prompts for their API keys, and wires up SABnzbd folders/categories, Sonarr/Radarr root folders + download clients, and Prowlarr applications that sync to Sonarr/Radarr.
 
 ### Compose combinations
 
